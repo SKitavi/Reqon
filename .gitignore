@@ -1,0 +1,31 @@
+# .gitignore for PHP project
+# Environment variables
+.env
+
+# XAMPP specific
+/htdocs/
+
+# PHP
+vendor/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.sql
+*.sqlite
+
+# Uploads (exclude user uploads but keep folder structure)
+uploads/*
+!uploads/.gitkeep
+
+# Sensitive files
+config/database.php
