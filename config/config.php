@@ -89,6 +89,6 @@ define('USER_ROLES', [
 require_once CONFIG_PATH . '/database.php';
 
 //Include helper functions
-require_once INCLUDES_PATH . '/functions.php'
+require_once INCLUDES_PATH . '/functions.php';
 
 ?>

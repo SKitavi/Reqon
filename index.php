@@ -7,8 +7,8 @@
 require_once __DIR__ . '/config/config.php';
 
 //Get requested route
-$route = isset($_GET['route'])?$_GET['route']:'home';
-$route = filter_var($route, FILTER_SANITIZE_STRING);
+$route = isset($_GET['route']) ? $_GET['route'] : 'home';
+$route = filter_var($route, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
 //Parse route
 $parts = explode('/', $route);
