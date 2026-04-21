@@ -1,6 +1,6 @@
 <?php
 /**
- * Main entry point and router
+ * Main entry point and router(redirects to login or dashboard)
  */
 
 //Load configuration
