@@ -25,7 +25,7 @@ if (file_exists(__DIR__.'/../.env')) {
     define('APP_NAME','Reqon');
     define('APP_ENV','development');
     define('APP_DEBUG', true );
-    define('APP_URL','http://localhost/reqon');
+    define('APP_URL','http://localhost/Reqon');
 }
 
 //Define paths
