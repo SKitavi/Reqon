@@ -163,3 +163,158 @@ function post(string $key, string $default = ''): string {
 function get(string $key, string $default = ''): string {
     return trim($_GET[$key] ?? $default);
 }
+
+// ── Approval helpers ──────────────────────────────────────────────────────
+ 
+/**
+ * Map a role string to its approval level integer.
+ * Returns 0 if the role has no approval power.
+ */
+function getRoleLevel(string $role): int {
+    $map = [
+        'dept_head'         => 1,
+        'hr_director'       => 2,
+        'finance_director'  => 3,
+        'managing_director' => 4,
+    ];
+    return $map[$role] ?? 0;
+}
+ 
+/**
+ * Map an approval level back to the role string expected at that level.
+ */
+function getLevelRole(int $level): string {
+    $map = [
+        1 => 'dept_head',
+        2 => 'hr_director',
+        3 => 'finance_director',
+        4 => 'managing_director',
+    ];
+    return $map[$level] ?? '';
+}
+ 
+/**
+ * Find the approver user for a given level.
+ * Level 1 (dept head) is department-scoped.
+ * Levels 2-4 are company-wide roles.
+ */
+function getNextApprover(int $level, int $deptId): ?array {
+    $role = getLevelRole($level);
+    if (!$role) return null;
+ 
+    if ($level === 1) {
+        return fetchOne(
+            "SELECT id, name, email FROM users WHERE role = ? AND department_id = ? LIMIT 1",
+            [$role, $deptId]
+        ) ?: null;
+    }
+ 
+    return fetchOne(
+        "SELECT id, name, email FROM users WHERE role = ? LIMIT 1",
+        [$role]
+    ) ?: null;
+}
+ 
+/**
+ * Build and fire the "advance or finalise" logic after an approval decision.
+ *
+ * $action   — 'approve' | 'reject'
+ * $reqId    — requisition primary key
+ * $approverId — the acting user's ID
+ * $comments — optional free-text reason
+ */
+function processApprovalDecision(string $action, int $reqId, int $approverId, string $comments = ''): void {
+ 
+    // Load the requisition
+    $req = fetchOne("SELECT * FROM requisitions WHERE id = ?", [$reqId]);
+    if (!$req) return;
+ 
+    $currentLevel = (int)$req['current_approval_level'];
+    $reqNumber    = $req['req_number'];
+    $submitterId  = (int)$req['submitted_by'];
+    $deptId       = (int)$req['department_id'];
+ 
+    // 1. Record decision in approval_history
+    //    Update existing pending row, or insert if missing (safety net).
+    $updated = query(
+        "UPDATE approval_history
+            SET decision = ?, comments = ?, decided_at = NOW()
+          WHERE requisition_id = ? AND approval_level = ? AND decision = 'pending'",
+        [$action === 'approve' ? 'approved' : 'rejected', $comments, $reqId, $currentLevel]
+    );
+ 
+    if ($updated->rowCount() === 0) {
+        // No pending row existed — create one retroactively
+        query(
+            "INSERT INTO approval_history
+               (requisition_id, approver_id, approval_level, decision, comments, decided_at)
+             VALUES (?, ?, ?, ?, ?, NOW())",
+            [$reqId, $approverId, $currentLevel, $action === 'approve' ? 'approved' : 'rejected', $comments]
+        );
+    }
+ 
+    // 2. Branch on decision
+    if ($action === 'reject') {
+ 
+        query(
+            "UPDATE requisitions SET status = 'rejected', updated_at = NOW() WHERE id = ?",
+            [$reqId]
+        );
+        query(
+            "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+            [
+                $submitterId, $reqId,
+                "Your requisition {$reqNumber} was rejected at " . approvalLevelLabel($currentLevel) . ".",
+            ]
+        );
+        auditLog('REJECT', 'requisitions', $reqId, "Rejected at level {$currentLevel}");
+ 
+    } else {
+        // Approved
+        if ($currentLevel < 4) {
+ 
+            // Advance to next level
+            $nextLevel    = $currentLevel + 1;
+            $nextApprover = getNextApprover($nextLevel, $deptId);
+ 
+            query(
+                "UPDATE requisitions SET current_approval_level = ?, updated_at = NOW() WHERE id = ?",
+                [$nextLevel, $reqId]
+            );
+ 
+            if ($nextApprover) {
+                // Create a pending approval_history row for the next approver
+                query(
+                    "INSERT INTO approval_history
+                       (requisition_id, approver_id, approval_level, decision)
+                     VALUES (?, ?, ?, 'pending')",
+                    [$reqId, $nextApprover['id'], $nextLevel]
+                );
+                query(
+                    "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+                    [
+                        $nextApprover['id'], $reqId,
+                        "{$reqNumber} has been approved by " . approvalLevelLabel($currentLevel)
+                        . " and now requires your approval (Level {$nextLevel}).",
+                    ]
+                );
+            }
+            auditLog('APPROVE', 'requisitions', $reqId, "Approved at level {$currentLevel}, advanced to {$nextLevel}");
+ 
+        } else {
+            // Level 4 approved — fully approved
+            query(
+                "UPDATE requisitions SET status = 'approved', updated_at = NOW() WHERE id = ?",
+                [$reqId]
+            );
+            query(
+                "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+                [
+                    $submitterId, $reqId,
+                    "Congratulations! Your requisition {$reqNumber} has been fully approved.",
+                ]
+            );
+            auditLog('APPROVE', 'requisitions', $reqId, "Final approval — fully approved");
+        }
+    }
+}
