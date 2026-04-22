@@ -2,6 +2,15 @@
 /**
  * Main entry point and router(redirects to login or dashboard)
  */
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/auth.php';
+ 
+if (isLoggedIn()) {
+    redirectAfterLogin();
+} else {
+    header('Location: /reqon/login.php');
+    exit;
+}
 
 //Load configuration
 require_once __DIR__ . '/config/config.php';
@@ -35,13 +44,10 @@ if ($module === 'home' || $module === '' || $module === 'login') {
     } else {
         showWelcomePage();
     }
-} elseif ($module === 'test') {
+} else ($module === 'test') {
     //Test page to verify setup
     showTestPage();
-} else {
-    //For now, show welcome page
-    showWelcomePage();
-}
+} 
 
 //Welcome page(delete in production)
 function showWelcomePage() {
