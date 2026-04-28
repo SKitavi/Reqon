@@ -54,8 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
     if (!$deptId) $errors[] = 'Please select a department.';
     if (!$dateReq) {
         $errors[] = 'Please provide the date required.';
-    } elseif (strtotime($dateReq) < strtotime(date('Y-m-d'))) {
-        $errors[] = 'Date required cannot be in the past.';
+    } elseif (strtotime($dateReq) <= strtotime(date('Y-m-d'))) {
+    $errors[] = 'Date required must be at least tomorrow.';
     }
     if ($type === 'personnel' && !$title) {
         $errors[] = 'Position title is required for personnel requisitions.';
@@ -381,7 +381,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="field">
         <label for="date_required">Date Required <span class="required">*</span></label>
         <input type="date" id="date_required" name="date_required"
-               min="<?= date('Y-m-d') ?>"
+               min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
                value="<?= e($form['date_required'] ?? '') ?>"
                onchange="showLeadTimeWarning(this.value)">
         <div id="lead-time-warning" class="lead-time-warning" style="display:none">
@@ -710,7 +710,7 @@ function showLeadTimeWarning(dateVal) {
   const daysAhead = Math.round((chosen - today) / 86400000);
 
   if (daysAhead < 30) {
-    textEl.textContent = 'Recommended lead time is 30 days. Current selection is only ' + daysAhead + ' day(s) away.';
+    textEl.textContent = 'Recommended lead time is 30 days. Your selection is only ' + daysAhead + ' day(s) from today.';
     warning.style.display = 'flex';
   } else {
     warning.style.display = 'none';
