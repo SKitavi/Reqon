@@ -1212,3 +1212,149 @@ table.req-table .req-id { font-weight: 600; }
 .audit-action.REJECT { background: var(--red-bg);    color: var(--red-text); }
 .audit-action.UPDATE { background: var(--orange-bg); color: var(--orange-text); }
 .audit-action.LOGIN  { background: #EBF4FF; color: #1A5276; }
+
+/* ══════════════════════════════════════════════════════════
+    POLISH & RESPONSIVE FIXES
+   ══════════════════════════════════════════════════════════ */
+ 
+/* Page-level loading state — add .loading to body while fetch is in flight */
+body.loading::after {
+  content: '';
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--green) 100%);
+  animation: topbar-progress 1.2s ease-in-out infinite;
+  z-index: 9999;
+}
+@keyframes topbar-progress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+ 
+/* Focus rings — accessibility */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+ 
+/* Smooth transitions on interactive elements */
+.btn, .queue-card, .notif-item, table.req-table tbody tr {
+  transition: box-shadow .15s, background .12s, border-color .12s;
+}
+ 
+/* Truncate long text in table cells */
+table.req-table td {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* But not the action column */
+table.req-table td:last-child {
+  overflow: visible;
+  white-space: normal;
+}
+ 
+/* Better select arrow on all browsers */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23718096' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+ 
+/* Responsive: stack filter bar on mobile */
+@media (max-width: 680px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-bar select,
+  .filter-bar input[type="date"],
+  .filter-bar .btn {
+    width: 100%;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .detail-topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .decision-btns {
+    grid-template-columns: 1fr !important;
+  }
+}
+ 
+/* Responsive: collapse detail sidebar below main on small screens */
+@media (max-width: 900px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-card {
+    margin-bottom: 16px;
+  }
+}
+ 
+/* Responsive: stat grid — 2 columns on tablet */
+@media (max-width: 640px) {
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+ 
+/* Print styles — useful for supervisor demo */
+@media print {
+  .topnav, .form-actions, .queue-card-actions,
+  .decision-panel, .filter-bar, .btn,
+  .nav-search, .nav-right { display: none !important; }
+  body { background: white; font-size: 12px; }
+  .detail-layout { grid-template-columns: 1fr; }
+  .card, .detail-card, .sidebar-card, .queue-card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  a { color: inherit; text-decoration: none; }
+}
+ 
+/* Subtle hover on stat cards */
+.stat-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+  cursor: default;
+}
+ 
+/* Status badge text — don't let it wrap */
+.badge { white-space: nowrap; }
+ 
+/* Flash message transition */
+.alert {
+  transition: opacity .4s ease;
+}
+ 
+/* Consistent table row height */
+table.req-table tbody td {
+  height: 52px;
+}
+ 
+/* Better empty state icon sizing */
+.empty-state .empty-icon {
+  font-size: 40px;
+  margin-bottom: 14px;
+  display: block;
+}
+ 
+/* Scrollbar styling (webkit) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--slate-light); }
