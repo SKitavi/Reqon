@@ -1,5 +1,6 @@
 <?php
-// include this at the top of every authenticated page AFTER calling requireLogin()
+// includes/header.php
+// Usage: include this at the top of every authenticated page AFTER calling requireLogin()
 // The $pageTitle variable should be set before including this file.
 
 $pageTitle = $pageTitle ?? 'Reqon';
@@ -50,7 +51,7 @@ $unreadCount     = (int) $notifStmt->fetchColumn();
   <div class="nav-right">
 
     <!-- Notification bell -->
-    <a href="#" class="nav-bell" aria-label="Notifications (<?= $unreadCount ?> unread)">
+    <a href="/reqon/notifications/index.php" class="nav-bell" aria-label="Notifications (<?= $unreadCount ?> unread)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -76,8 +77,12 @@ $unreadCount     = (int) $notifStmt->fetchColumn();
 
       <div class="nav-dropdown" id="user-dropdown" role="menu">
         <a href="/reqon/dashboard.php" role="menuitem">Dashboard</a>
+        <a href="/reqon/notifications/index.php" role="menuitem">
+          Notifications<?= $unreadCount > 0 ? ' (' . $unreadCount . ')' : '' ?>
+        </a>
         <?php if (hasRole('dept_head','hr_director','finance_director','managing_director')): ?>
           <a href="/reqon/approvals/queue.php" role="menuitem">Approval Queue</a>
+          <a href="/reqon/admin/audit.php" role="menuitem">Audit Log</a>
         <?php endif; ?>
         <div class="divider"></div>
         <a href="/reqon/logout.php" class="logout-link" role="menuitem">Log out</a>
