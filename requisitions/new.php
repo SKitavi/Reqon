@@ -11,7 +11,7 @@ $user = currentUser();
 $db   = getDB();
 
 // ── Load departments for dropdowns ────────────────────────────────────────
-$departments = fetchAll("SELECT id, name FROM departments ORDER BY name");
+$departments = fetchAll("SELECT department_id, department_name FROM departments ORDER BY department_name");
 
 // ── Determine current step ────────────────────────────────────────────────
 // Step advances on valid POST. Defaults to 1 on first visit.
@@ -153,14 +153,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         // Insert requisition
         query(
             "INSERT INTO requisitions
-               (requisition_id,requisition_number, requisition_type, current_status, priority, requester_id, department_id,
+               (requisition_number, requisition_type, current_status, priority, requester_id, department_id,
                  date_required, description, total_amount, current_approval_level)
-             VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, 1)",
+             VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, 1)",
             [
                 $reqNumber,
                 $form['type'],
                 $form['priority'],
-                $user['id'],
+                $user['user_id'],
                 $form['department_id'] ?: null,
                 $form['date_required'],
                 $form['description'],
@@ -169,9 +169,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         );
 
         $reqId = lastInsertId();
-
-        // Also save the requisition_number back into the row (race-condition-safe)
-        query("UPDATE requisitions SET requisition_number = ? WHERE requisition_id = ?", [$reqNumber, $reqId]);
 
         // Insert line items (procurement / IT asset / merchandise)
         if (!empty($form['items'])) {
@@ -187,22 +184,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         // Create approval_history row for level 1 approver (Dept Head)
         // We look up the dept head for this department
         $deptHead = fetchOne(
-            "SELECT user_id FROM users WHERE department_id = ? AND role = 'dept_head' LIMIT 1",
+            "SELECT user_id FROM users WHERE department_id = ? AND role_id = 3 AND section LIKE '%Dept Head%' LIMIT 1",
             [$form['department_id']]
         );
-        $approverId = $deptHead['id'] ?? null;
+        $approverId = $deptHead['user_id'] ?? null;
 
         if ($approverId) {
             query(
-                "INSERT INTO approval_history (requisition_id, approver_id, approval_level, decision)
+                "INSERT INTO approval_history (requisition_id, approver_id, level_id, decision)
                  VALUES (?, ?, 1, 'pending')",
                 [$reqId, $approverId]
             );
 
             // Notify the dept head
             query(
-                "INSERT INTO notifications (user_id, requisition_id, message)
-                 VALUES (?, ?, ?)",
+                "INSERT INTO notifications (user_id, requisition_id, notification_type, message)
+                 VALUES (?, ?, 'submission', ?)",
                 [
                     $approverId,
                     $reqId,
@@ -345,7 +342,7 @@ include __DIR__ . '/../includes/header.php';
       <!-- Department -->
       <div class="field">
         <label for="department_id">Department <span class="required">*</span></label>
-        <select id="department_id" name="department_name" >
+        <select id="department_id" name="department_id" >
           <option value="">Select Department</option>
           <?php foreach ($departments as $dept): ?>
             <option value="<?= $dept['department_id'] ?>"
@@ -552,7 +549,7 @@ include __DIR__ . '/../includes/header.php';
           </div>
           <div class="review-field">
             <span class="rf-label">Section</span>
-            <span class="rf-value"><?= e($sectionName ?: '—') ?></span>
+            <span class="rf-value"><?= e($user['section'] ?: '—') ?></span>
           </div>
           <div class="review-field">
             <span class="rf-label">Date Required</span>

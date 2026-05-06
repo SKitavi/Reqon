@@ -9,9 +9,9 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user      = currentUser();
-$userRole  = $user['role'] ?? '';
-$userLevel = getRoleLevel($userRole);
-$isAdmin   = $userRole === 'admin';
+$userRole  = $user['role_name'] ?? '';
+$userLevel = getRoleLevel($user);
+$isAdmin   = strtolower($userRole) === 'system admin';
 $isApprover = $userLevel > 0 || $isAdmin;
 
 // ── Filters ───────────────────────────────────────────────
@@ -268,7 +268,7 @@ include __DIR__ . '/../includes/header.php';
                 <?= e(formatDate($req['date_required'])) ?>
               </td>
               <td class="text-muted" style="white-space:nowrap">
-                <?= e(timeAgo($req['submission_date'] ?? $req['created_date'])) ?>
+                <?= e(timeAgo($req['submission_date'] ?? $req['created_at'])) ?>
               </td>
               <td>
                 <a href="<?= BASE_URL ?>/requisitions/view.php?id=<?= (int)$req['requisition_id'] ?>"

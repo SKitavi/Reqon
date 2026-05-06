@@ -31,7 +31,7 @@ $where  = ["r.current_status = 'pending'", "r.current_approval_level = ?"];
 $params = [$userLevel];
 
 if ($search) {
-    $where[]  = "(r.requisition_number LIKE ? OR u.full_name LIKE ? OR r.description LIKE ?)";    $like     = "%{$search}%";
+    $where[]  = "(r.requisition_number LIKE ? OR u.full_name LIKE ? OR r.description LIKE ?)";
     $like     = "%{$search}%";
     $params[] = $like;
     $params[] = $like;
@@ -231,7 +231,7 @@ include __DIR__ . '/../includes/header.php';
           Submitted by: <strong><?= e($req['submitter_name'] ?? '—') ?></strong>
           (<?= e($req['dept_name'] ?? '—') ?>)
           &nbsp;·&nbsp;
-          Date: <?= e(formatDate($req['submission_date'] ?? $req['created_at'])) ?>   
+          Date: <?= e(formatDate($req['submission_date'] ?? $req['created_at'])) ?>
           <?php
             if ($req['requisition_type'] === 'personnel' && !empty($req['description'])) {
                 $snippet = mb_strimwidth($req['description'], 0, 80, '…');

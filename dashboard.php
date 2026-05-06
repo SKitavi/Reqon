@@ -174,7 +174,7 @@ include __DIR__ . '/includes/header.php';
             <?php foreach ($recentReqs as $req): ?>
               <tr>
                 <td class="req-id">
-                  <?= htmlspecialchars($req['requisition_number'] ?? ('REQ-' . str_pad($req['id'], 3, '0', STR_PAD_LEFT))) ?>
+                  <?= htmlspecialchars($req['requisition_number'] ?? ('REQ-' . str_pad($req['requisition_id'], 3, '0', STR_PAD_LEFT))) ?>
                 </td>
                 <td><?= htmlspecialchars($req['dept_name'] ?? '—') ?></td>
                 <?php if ($isApprover): ?>

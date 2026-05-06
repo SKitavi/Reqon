@@ -8,8 +8,9 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 // Only approvers(level > 0) and admin can view the audit log
-$userLevel = getRoleLevel(currentUser());
-$isAdmin   = (currentUser()['role_id'] ?? 0) == 1;
+$currentUser = currentUser();
+$userLevel = getRoleLevel($currentUser);
+$isAdmin   = ($currentUser['role_id'] ?? 0) == 1;
 if ($userLevel === 0 && !$isAdmin) {
     setFlash('error', 'Access denied.');
     redirect(BASE_URL . '/dashboard.php');

@@ -6,8 +6,8 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user      = currentUser();
-$userRole  = $user['role'] ?? '';
-$userLevel = getRoleLevel($userRole);
+$userRole  = $user['role_name'] ?? '';
+$userLevel = getRoleLevel($user);
 $reqId     = (int)(get('id'));
 
 if (!$reqId) {
@@ -16,8 +16,9 @@ if (!$reqId) {
 }
 
 $req = fetchOne(
-    "SELECT r.*, u.username AS submitter_name, u.email AS submitter_email,
-            d.department_name AS dept_name, s.name AS section_name
+    "SELECT r.*, u.full_name AS submitter_name, u.email AS submitter_email,
+            u.section AS submitter_section,
+            d.department_name AS dept_name
        FROM requisitions r
        LEFT JOIN users u ON u.user_id = r.requester_id
        LEFT JOIN departments d ON d.department_id = r.department_id
@@ -30,9 +31,9 @@ if (!$req) {
     redirect(BASE_URL . '/dashboard.php');
 }
 
-$isOwner    = (int)$req['requester_id'] === (int)$user['id'];
+$isOwner    = (int)$req['requester_id'] === (int)$user['user_id'];
 $isApprover = $userLevel > 0;
-$isAdmin    = $userRole === 'admin';
+$isAdmin    = strtolower($userRole) === 'system admin';
 
 if (!$isOwner && !$isApprover && !$isAdmin) {
     setFlash('error', 'You do not have permission to view this requisition.');
@@ -40,22 +41,23 @@ if (!$isOwner && !$isApprover && !$isAdmin) {
 }
 
 $items = fetchAll(
-    "SELECT * FROM requisition_items WHERE requisition_id = ? ORDER BY id",
+    "SELECT * FROM requisition_items WHERE requisition_id = ? ORDER BY item_id",
     [$reqId]
 );
 
 $approvalHistory = fetchAll(
-    "SELECT ah.*, u.username AS approver_name, u.role AS approver_role
+    "SELECT ah.*, u.full_name AS approver_name, r.role_name AS approver_role
        FROM approval_history ah
        LEFT JOIN users u ON u.user_id = ah.approver_id
+       LEFT JOIN roles r ON r.role_id = u.role_id
       WHERE ah.requisition_id = ?
-      ORDER BY ah.approval_level ASC, ah.id ASC",
+      ORDER BY ah.level_id ASC, ah.approval_id ASC",
     [$reqId]
 );
 
 $approvalByLevel = [];
 foreach ($approvalHistory as $ah) {
-    $approvalByLevel[(int)$ah['approval_level']] = $ah;
+    $approvalByLevel[(int)$ah['level_id']] = $ah;
 }
 
 $canDecide = (
@@ -99,7 +101,7 @@ for ($lvl = 1; $lvl <= 4; $lvl++) {
         'label'    => approvalLevelLabel($lvl),
         'current_status'   => $status,
         'approver' => $ah['approver_name'] ?? null,
-        'date'     => $ah['decided_at']    ?? null,
+        'date'     => $ah['decision_date'] ?? null,
         'comment'  => $ah['comments']      ?? null,
     ];
 }
@@ -147,7 +149,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="detail-section" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 26px">
         <?= statusBadge($req['current_status']) ?>
         <span style="color:var(--border)">|</span>
-        <span style="font-size:13px;color:var(--text-muted)">Type: <strong><?= e(REQUISITION_TYPES[$req['type']] ?? ucfirst($req['type'])) ?></strong></span>
+        <span style="font-size:13px;color:var(--text-muted)">Type: <strong><?= e(REQUISITION_TYPES[$req['requisition_type']] ?? ucfirst($req['requisition_type'])) ?></strong></span>
         <span style="color:var(--border)">|</span>
         <?= priorityBadge($req['priority'] ?? 'medium') ?>
         <span style="color:var(--border)">|</span>
@@ -159,7 +161,7 @@ include __DIR__ . '/../includes/header.php';
         <h2 class="detail-section-title">Requisition details</h2>
         <div class="detail-meta-grid">
           <div class="detail-field"><span class="df-label">Department</span><span class="df-value"><?= e($req['dept_name'] ?? '—') ?></span></div>
-          <div class="detail-field"><span class="df-label">Section</span><span class="df-value"><?= e($req['section_name'] ?? '—') ?></span></div>
+          <div class="detail-field"><span class="df-label">Section</span><span class="df-value"><?= e($req['submitter_section'] ?? '—') ?></span></div>
           <div class="detail-field"><span class="df-label">Submitted by</span><span class="df-value"><?= e($req['submitter_name'] ?? '—') ?></span></div>
           <div class="detail-field"><span class="df-label">Date submitted</span><span class="df-value"><?= e(formatDate($req['created_at'])) ?></span></div>
           <div class="detail-field"><span class="df-label">Date required</span><span class="df-value"><?= e(formatDate($req['date_required'])) ?></span></div>
@@ -205,7 +207,7 @@ include __DIR__ . '/../includes/header.php';
           <div class="comment-item">
             <div class="comment-header">
               <span class="comment-author"><?= e($c['approver_name'] ?? '—') ?></span>
-              <span class="comment-date"><?= e(formatDate($c['decided_at'], 'd/m/Y H:i')) ?></span>
+              <span class="comment-date"><?= e(formatDate($c['decision_date'], 'd/m/Y H:i')) ?></span>
             </div>
             <div class="comment-body">"<?= nl2br(e($c['comments'])) ?>"</div>
           </div>
@@ -295,7 +297,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="sidebar-card-body" style="display:flex;flex-direction:column;gap:12px">
         <div class="detail-field"><span class="df-label">Requisition ID</span><span class="df-value" style="font-family:monospace"><?= e($req['requisition_number']) ?></span></div>
         <div class="detail-field"><span class="df-label">Current level</span>
-          <span class="df-value"><?= $req['current_status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['status']) ?></span>
+          <span class="df-value"><?= $req['current_status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['current_status']) ?></span>
         </div>
         <div class="detail-field"><span class="df-label">Last updated</span><span class="df-value"><?= e(timeAgo($req['updated_at'] ?? $req['created_at'])) ?></span></div>
         <?php if ($req['total_amount'] > 0): ?>

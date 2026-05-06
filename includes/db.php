@@ -1,26 +1,8 @@
 <?php
-// pdo connection
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'reqon_db');
-define('DB_USER', 'root');
-define('DB_PASS', '');  // default
-
-function getDB(): PDO {
-    static $pdo = null;
-    if ($pdo === null) {
-        try {
-            $pdo = new PDO(
-                "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-                DB_USER, DB_PASS,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]
-            );
-        } catch (PDOException $e) {
-            die("DB connection failed: " . $e->getMessage());
-        }
-    }
-    return $pdo;
+// includes/db.php
+// Thin shim — the real connection is handled by config/database.php.
+// This file is kept for backward compatibility only.
+// config/config.php (which loads config/database.php) must be loaded first.
+if (!function_exists('getDB')) {
+    require_once __DIR__ . '/../config/config.php';
 }
