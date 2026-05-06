@@ -1,6 +1,6 @@
 <?php
 // login.php - Screen 1
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/auth.php';
 
 // If already logged in, redirect away

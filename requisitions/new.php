@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         // Insert requisition
         query(
             "INSERT INTO requisitions
-               (req_number, type, status, priority, submitted_by, department_id,
+               (requisition_id,requisition_number, requisition_type, current_status, priority, requester_id, department_id,
                 section_id, date_required, justification, total_amount, current_approval_level)
              VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, 1)",
             [

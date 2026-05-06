@@ -6,11 +6,16 @@
 $pageTitle = $pageTitle ?? 'Reqon';
 $user      = currentUser();
 
-// Unread notification count (simple query)
-$db              = getDB();
-$notifStmt       = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
-$notifStmt->execute([$user['id']]);
-$unreadCount     = (int) $notifStmt->fetchColumn();
+// Unread notification count 
+$notifStmt = getDB()->prepare(
+    "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_status = 'unread'"
+);
+$notifStmt->execute([$user['user_id']]);   
+$unreadCount = (int)$notifStmt->fetchColumn();
+ 
+// Is this user an approver? Used to show/hide queue and audit links.
+$userLevel  = getRoleLevel($user);         
+$isApprover = $userLevel > 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,20 +77,20 @@ $unreadCount     = (int) $notifStmt->fetchColumn();
           <circle cx="12" cy="7" r="4"/>
         </svg>
       </div>
-      <span class="user-name"><?= htmlspecialchars($user['name']) ?></span>
+      <span class="user-name"><?= e($user['full_name'] ?? $user['name'] ?? '') ?></span>
       <span class="chevron" aria-hidden="true">▾</span>
-
+ 
       <div class="nav-dropdown" id="user-dropdown" role="menu">
-        <a href="/reqon/dashboard.php" role="menuitem">Dashboard</a>
-        <a href="/reqon/notifications/index.php" role="menuitem">
+        <a href="<?= BASE_URL ?>/dashboard.php" role="menuitem">Dashboard</a>
+        <a href="<?= BASE_URL ?>/notifications/index.php" role="menuitem">
           Notifications<?= $unreadCount > 0 ? ' (' . $unreadCount . ')' : '' ?>
         </a>
-        <?php if (hasRole('dept_head','hr_director','finance_director','managing_director')): ?>
-          <a href="/reqon/approvals/queue.php" role="menuitem">Approval Queue</a>
-          <a href="/reqon/admin/audit.php" role="menuitem">Audit Log</a>
+        <?php if ($isApprover): ?>
+          <a href="<?= BASE_URL ?>/approvals/queue.php" role="menuitem">Approval Queue</a>
+          <a href="<?= BASE_URL ?>/admin/audit.php"     role="menuitem">Audit Log</a>
         <?php endif; ?>
         <div class="divider"></div>
-        <a href="/reqon/logout.php" class="logout-link" role="menuitem">Log out</a>
+        <a href="<?= BASE_URL ?>/logout.php" class="logout-link" role="menuitem">Log out</a>
       </div>
     </div>
 

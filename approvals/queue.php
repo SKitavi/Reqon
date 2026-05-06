@@ -8,8 +8,7 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user      = currentUser();
-$userRole  = $user['role'] ?? '';
-$userLevel = getRoleLevel($userRole);
+$userLevel = getRoleLevel($user);  
 
 // Non-approvers have no business here
 if ($userLevel === 0) {
@@ -28,11 +27,11 @@ $perPage   = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
 $highlight = (int)get('highlight'); // scroll to this card after a redirect
 
 // ── Build query ───────────────────────────────────────────────────────────
-$where  = ["r.status = 'pending'", "r.current_approval_level = ?"];
+$where  = ["r.current_status = 'pending'", "r.current_approval_level = ?"];
 $params = [$userLevel];
 
 if ($search) {
-    $where[]  = "(r.req_number LIKE ? OR u.name LIKE ? OR r.justification LIKE ?)";
+    $where[]  = "(r.requisition_number LIKE ? OR u.full_name LIKE ? OR r.description LIKE ?)";    $like     = "%{$search}%";
     $like     = "%{$search}%";
     $params[] = $like;
     $params[] = $like;
@@ -40,7 +39,7 @@ if ($search) {
 }
 
 if ($filterType && array_key_exists($filterType, REQUISITION_TYPES)) {
-    $where[]  = "r.type = ?";
+    $where[]  = "r.requisition_type = ?";
     $params[] = $filterType;
 }
 
@@ -50,12 +49,12 @@ if ($filterPriority && in_array($filterPriority, ['high','medium','low'])) {
 }
 
 if ($dateFrom) {
-    $where[]  = "r.created_at >= ?";
+    $where[]  = "r.submission_date >= ?";
     $params[] = $dateFrom . ' 00:00:00';
 }
 
 if ($dateTo) {
-    $where[]  = "r.created_at <= ?";
+    $where[]  = "r.submission_date <= ?";
     $params[] = $dateTo . ' 23:59:59';
 }
 
@@ -65,7 +64,7 @@ $whereSQL = implode(' AND ', $where);
 $totalRow   = fetchOne(
     "SELECT COUNT(*) AS cnt
        FROM requisitions r
-       LEFT JOIN users u ON u.id = r.submitted_by
+       LEFT JOIN users u ON u.user_id = r.requester_id
       WHERE {$whereSQL}",
     $params
 );
@@ -75,22 +74,23 @@ $offset     = ($page - 1) * $perPage;
 
 // Fetch the current page
 $reqs = fetchAll(
-    "SELECT
-         r.*,
-         u.name          AS submitter_name,
-         u.email         AS submitter_email,
-         d.name          AS dept_name,
-         s.name          AS section_name,
-         (SELECT COUNT(*) FROM requisition_items ri WHERE ri.requisition_id = r.id)  AS item_count,
-         (SELECT ri.item_name FROM requisition_items ri WHERE ri.requisition_id = r.id LIMIT 1) AS first_item
+    "SELECT r.*,
+            u.full_name       AS submitter_name,         
+            u.email           AS submitter_email,
+            d.department_name AS dept_name,               
+            (SELECT COUNT(*) FROM requisition_items ri
+              WHERE ri.requisition_id = r.requisition_id) AS item_count,
+            (SELECT ri.item_description                   
+               FROM requisition_items ri
+              WHERE ri.requisition_id = r.requisition_id
+              LIMIT 1)                                     AS first_item
        FROM requisitions r
-       LEFT JOIN users u ON u.id = r.submitted_by
-       LEFT JOIN departments d ON d.id = r.department_id
-       LEFT JOIN sections s ON s.id = r.section_id
+       LEFT JOIN users      u ON u.user_id       = r.requester_id
+       LEFT JOIN departments d ON d.department_id = r.department_id
       WHERE {$whereSQL}
       ORDER BY
-         CASE r.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
-         r.created_at ASC
+        CASE r.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
+        r.submission_date ASC
       LIMIT {$perPage} OFFSET {$offset}",
     $params
 );
@@ -108,9 +108,9 @@ function typeIcon(string $type): string {
 
 // Build current URL params for pagination links (without 'page')
 function paginationUrl(array $extra = []): string {
-    $params = array_merge($_GET, $extra);
-    unset($params['page']);
-    $qs = http_build_query(array_filter($params));
+    $p  = array_merge($_GET, $extra);
+    unset($p['page']);
+    $qs = http_build_query(array_filter($p));
     return BASE_URL . '/approvals/queue.php?' . $qs . ($qs ? '&' : '');
 }
 
@@ -201,7 +201,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="queue-list" role="list">
 
       <?php foreach ($reqs as $req):
-        $reqId     = (int)$req['id'];
+        $reqId     = (int)$req['requisition_id'];
         $isHighlight = ($highlight === $reqId);
       ?>
 
@@ -215,10 +215,12 @@ include __DIR__ . '/../includes/header.php';
         <!-- Header row: icon + id + type + priority badge -->
         <div class="queue-card-header">
           <div class="queue-card-title">
-            <span class="type-icon" aria-hidden="true"><?= typeIcon($req['type']) ?></span>
-            <span class="req-id"><?= e($req['req_number']) ?></span>
+            <span class="type-icon" aria-hidden="true">
+              <?= typeIcon($req['requisition_type']) ?>       
+            </span>
+            <span class="req-id"><?= e($req['requisition_number']) ?></span>   
             <span class="req-type">
-              <?= e(REQUISITION_TYPES[$req['type']] ?? ucfirst($req['type'])) ?> Requisition
+              <?= e(REQUISITION_TYPES[$req['requisition_type']] ?? ucfirst($req['requisition_type'])) ?> Requisition
             </span>
           </div>
           <?= priorityBadge($req['priority']) ?>
@@ -229,17 +231,16 @@ include __DIR__ . '/../includes/header.php';
           Submitted by: <strong><?= e($req['submitter_name'] ?? '—') ?></strong>
           (<?= e($req['dept_name'] ?? '—') ?>)
           &nbsp;·&nbsp;
-          Date: <?= e(formatDate($req['created_at'])) ?>
+          Date: <?= e(formatDate($req['submission_date'] ?? $req['created_at'])) ?>   
           <?php
-            // Build a short description snippet
-            if ($req['type'] === 'personnel' && !empty($req['justification'])) {
-              $snippet = mb_strimwidth($req['justification'], 0, 80, '…');
+            if ($req['requisition_type'] === 'personnel' && !empty($req['description'])) {
+                $snippet = mb_strimwidth($req['description'], 0, 80, '…');
             } elseif ($req['item_count'] > 0) {
-              $snippet = e($req['first_item']);
-              if ($req['item_count'] > 1) $snippet .= ' + ' . ($req['item_count'] - 1) . ' more item(s)';
-              if ($req['total_amount'] > 0) $snippet .= ' — ' . formatKES((float)$req['total_amount']);
+                $snippet = e($req['first_item']);
+                if ($req['item_count'] > 1) $snippet .= ' + ' . ($req['item_count'] - 1) . ' more item(s)';
+                if ($req['total_amount'] > 0) $snippet .= ' — ' . formatKES((float)$req['total_amount']);
             } else {
-              $snippet = mb_strimwidth($req['justification'] ?? '', 0, 80, '…');
+                $snippet = mb_strimwidth($req['description'] ?? '', 0, 80, '…');
             }
           ?>
           <?php if ($snippet): ?>
@@ -281,7 +282,7 @@ include __DIR__ . '/../includes/header.php';
 
           <!-- Approve -->
           <form method="POST" action="<?= BASE_URL ?>/approvals/action.php"
-                onsubmit="return confirmApprove(event, '<?= e($req['req_number']) ?>')">
+                onsubmit="return confirmApprove(event, '<?= e($req['requisition_number']) ?>')">
             <input type="hidden" name="requisition_id" value="<?= $reqId ?>">
             <input type="hidden" name="action" value="approve">
             <input type="hidden" name="comments" value="">
@@ -297,7 +298,7 @@ include __DIR__ . '/../includes/header.php';
           <!-- Reject (opens inline modal) -->
           <button type="button" class="btn btn-outline btn-sm"
                   style="color:var(--brand);border-color:var(--brand)"
-                  onclick="openRejectModal(<?= $reqId ?>, '<?= e($req['req_number']) ?>')">
+                  onclick="openRejectModal(<?= $reqId ?>, '<?= e($req['requisition_number']) ?>')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10"/>

@@ -1,77 +1,67 @@
 <?php
 // dashboard.php
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/auth.php';
 
 requireLogin(); // redirects to login if no session
 
-$user = currentUser();
-$db   = getDB();
-$uid  = $user['id'];
+$user       = currentUser();
+$uid        = (int)$user['user_id'];          
+$userLevel  = getRoleLevel($user);             
 
 // ── Stats ─────────────────────────────────────────────────
 // For approvers: show org-wide stats. For staff: show only their own.
-$isApprover = hasRole('dept_head','hr_director','finance_director','managing_director','admin');
+$isApprover = $userLevel > 0 || ($user['role_id'] ?? 0) == 1;
 
 if ($isApprover) {
-    $statsStmt = $db->query("
-        SELECT
-          COUNT(*)                                        AS total,
-          SUM(status = 'pending')                         AS pending,
-          SUM(status = 'approved')                        AS approved,
-          SUM(status = 'rejected')                        AS rejected
-        FROM requisitions
-    ");
+    $statsStmt = getDB()->query(
+        "SELECT COUNT(*) AS total,
+                SUM(current_status='pending')  AS pending,
+                SUM(current_status='approved') AS approved,
+                SUM(current_status='rejected') AS rejected
+           FROM requisitions"
+    );
 } else {
-    $statsStmt = $db->prepare("
-        SELECT
-          COUNT(*)                                        AS total,
-          SUM(status = 'pending')                         AS pending,
-          SUM(status = 'approved')                        AS approved,
-          SUM(status = 'rejected')                        AS rejected
-        FROM requisitions
-        WHERE submitted_by = ?
-    ");
+    $statsStmt = getDB()->prepare(
+        "SELECT COUNT(*) AS total,
+                SUM(current_status='pending')  AS pending,
+                SUM(current_status='approved') AS approved,
+                SUM(current_status='rejected') AS rejected
+           FROM requisitions
+          WHERE requester_id = ?"          // was submitted_by
+    );
     $statsStmt->execute([$uid]);
 }
 $stats = $statsStmt->fetch();
-
-// ── Recent requisitions (last 10) ─────────────────────────
+ 
+// ── Recent requisitions (last 10) ─────────────────────────────────────────
 if ($isApprover) {
-    $recentStmt = $db->query("
-        SELECT r.*, d.name AS dept_name, u.name AS submitter_name
-        FROM requisitions r
-        LEFT JOIN departments d ON d.id = r.department_id
-        LEFT JOIN users u       ON u.id = r.submitted_by
-        ORDER BY r.created_at DESC
-        LIMIT 10
-    ");
+    $recentStmt = getDB()->query(
+        "SELECT r.*,
+                d.department_name AS dept_name,
+                u.full_name       AS submitter_name    -- was username / name
+           FROM requisitions r
+           LEFT JOIN departments d ON d.department_id = r.department_id
+           LEFT JOIN users      u ON u.user_id         = r.requester_id
+          ORDER BY r.created_at DESC
+          LIMIT 10"
+    );
 } else {
-    $recentStmt = $db->prepare("
-        SELECT r.*, d.name AS dept_name, u.name AS submitter_name
-        FROM requisitions r
-        LEFT JOIN departments d ON d.id = r.department_id
-        LEFT JOIN users u       ON u.id = r.submitted_by
-        WHERE r.submitted_by = ?
-        ORDER BY r.created_at DESC
-        LIMIT 10
-    ");
+    $recentStmt = getDB()->prepare(
+        "SELECT r.*,
+                d.department_name AS dept_name,
+                u.full_name       AS submitter_name
+           FROM requisitions r
+           LEFT JOIN departments d ON d.department_id = r.department_id
+           LEFT JOIN users      u ON u.user_id         = r.requester_id
+          WHERE r.requester_id = ?
+          ORDER BY r.created_at DESC
+          LIMIT 10"
+    );
     $recentStmt->execute([$uid]);
 }
 $recentReqs = $recentStmt->fetchAll();
-
-// ── Helpers ───────────────────────────────────────────────
-function statusBadge(string $status): string {
-    $map = [
-        'pending'   => 'badge-pending',
-        'approved'  => 'badge-approved',
-        'rejected'  => 'badge-rejected',
-        'cancelled' => 'badge-cancelled',
-    ];
-    $cls = $map[$status] ?? 'badge-pending';
-    return '<span class="badge ' . $cls . '">' . ucfirst($status) . '</span>';
-}
-
+ 
 $pageTitle = 'Dashboard';
 include __DIR__ . '/includes/header.php';
 ?>
@@ -184,21 +174,21 @@ include __DIR__ . '/includes/header.php';
             <?php foreach ($recentReqs as $req): ?>
               <tr>
                 <td class="req-id">
-                  <?= htmlspecialchars($req['req_number'] ?? ('REQ-' . str_pad($req['id'], 3, '0', STR_PAD_LEFT))) ?>
+                  <?= htmlspecialchars($req['requisition_number'] ?? ('REQ-' . str_pad($req['id'], 3, '0', STR_PAD_LEFT))) ?>
                 </td>
                 <td><?= htmlspecialchars($req['dept_name'] ?? '—') ?></td>
                 <?php if ($isApprover): ?>
                   <td><?= htmlspecialchars($req['submitter_name'] ?? '—') ?></td>
                 <?php endif; ?>
                 <td style="text-transform: capitalize">
-                  <?= htmlspecialchars(str_replace('_', ' ', $req['type'])) ?>
+                  <?= htmlspecialchars(str_replace('_', ' ', $req['requisition_type'])) ?>
                 </td>
-                <td><?= statusBadge($req['status']) ?></td>
+                <td><?= statusBadge($req['current_status']) ?></td>
                 <td class="text-muted">
-                  <?= htmlspecialchars(date('Y-m-d', strtotime($req['created_at']))) ?>
+                  <?= htmlspecialchars(formatDate($req['submission_date'] ?? $req['created_at'])) ?>
                 </td>
                 <td>
-                  <a href="/reqon/requisitions/view.php?id=<?= $req['id'] ?>"
+                  <a href="/reqon/requisitions/view.php?id=<?= (int)$req['requisition_id'] ?>"
                      class="btn btn-outline btn-sm">View</a>
                 </td>
               </tr>

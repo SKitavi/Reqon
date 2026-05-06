@@ -9,11 +9,11 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user = currentUser();
-$uid  = (int)$user['id'];
+$uid  = (int)$user['user_id'];
 
 // Mark all as read if requested (form POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'mark_all_read') {
-    query("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [$uid]);
+    query("UPDATE notifications SET read_status = 'read' WHERE user_id = ?", [$uid]);
     setFlash('success', 'All notifications marked as read.');
     redirect(BASE_URL . '/notifications/index.php');
 }
@@ -28,17 +28,18 @@ $total = (int)(fetchOne(
 )['cnt'] ?? 0);
 
 $notifications = fetchAll(
-    "SELECT n.*, r.req_number
+    "SELECT n.*, r.requisition_number   
        FROM notifications n
-       LEFT JOIN requisitions r ON r.id = n.requisition_id
+       LEFT JOIN requisitions r ON r.requisition_id = n.requisition_id
       WHERE n.user_id = ?
-      ORDER BY n.created_at DESC
+      ORDER BY n.sent_date DESC         
       LIMIT ? OFFSET ?",
     [$uid, $perPage, $offset]
 );
 
 $unreadCount = (int)(fetchOne(
-    "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0", [$uid]
+    "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND read_status = 'unread'",
+    [$uid]
 )['cnt'] ?? 0);
 
 $totalPages = (int)ceil($total / $perPage);
@@ -81,26 +82,26 @@ include __DIR__ . '/../includes/header.php';
 
       <div class="notif-list" role="list">
         <?php foreach ($notifications as $n):
-          $isUnread = !(bool)$n['is_read'];
+          $isUnread = ($n['read_status'] === 'unread');
           $reqId    = $n['requisition_id'];
-          $reqNum   = $n['req_number'] ?? null;
+          $reqNum   = $n['requisition_number'] ?? null;    
           $link     = $reqId
-            ? BASE_URL . '/requisitions/view.php?id=' . $reqId
-            : '#';
+              ? BASE_URL . '/requisitions/view.php?id=' . $reqId
+              : '#';
         ?>
 
         <a href="<?= e($link) ?>"
            class="notif-item <?= $isUnread ? 'unread' : '' ?>"
            role="listitem"
-           data-notif-id="<?= (int)$n['id'] ?>"
-           onclick="markRead(<?= (int)$n['id'] ?>)"
+           data-notif-id="<?= (int)$n['notification_id'] ?>"
+           onclick="markRead(<?= (int)$n['notification_id'] ?>)"
            aria-label="<?= $isUnread ? 'Unread: ' : '' ?><?= e($n['message']) ?>">
 
           <div class="notif-dot" aria-hidden="true"></div>
 
           <div class="notif-content">
             <div class="notif-message"><?= e($n['message']) ?></div>
-            <div class="notif-time"><?= e(timeAgo($n['created_at'])) ?></div>
+            <div class="notif-time"><?= e(timeAgo($n['sent_date'])) ?></div>
           </div>
 
           <?php if ($reqNum): ?>

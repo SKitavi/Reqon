@@ -15,7 +15,7 @@ if (!isLoggedIn()) {
     exit;
 }
 
-$deptId = (int)($_GET['department_id'] ?? 0);
+/* $deptId = (int)($_GET['department_id'] ?? 0);
 
 if (!$deptId) {
     echo json_encode([]);
@@ -26,5 +26,5 @@ $sections = fetchAll(
     "SELECT id, name FROM sections WHERE department_id = ? ORDER BY name",
     [$deptId]
 );
-
-echo json_encode($sections);
+*/
+echo json_encode([]);

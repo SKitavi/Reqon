@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$uid    = (int)currentUser()['id'];
+$uid    = (int)currentUser()['user_id'];
 $action = post('action');
 
 if ($action === 'mark_read') {
@@ -31,7 +31,8 @@ if ($action === 'mark_read') {
     }
     // Only mark notifications that belong to this user
     query(
-        "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+        "UPDATE notifications SET read_status = 'read'
+          WHERE notification_id = ? AND user_id = ?",
         [$id, $uid]
     );
     echo json_encode(['ok' => true]);
@@ -39,11 +40,11 @@ if ($action === 'mark_read') {
 } elseif ($action === 'unread_count') {
     // Used by header bell badge — call this on page load if you want live count
     $row = fetchOne(
-        "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0",
+        "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND read_status = 'unread'",
         [$uid]
     );
     echo json_encode(['ok' => true, 'count' => (int)($row['cnt'] ?? 0)]);
-
+ 
 } else {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Unknown action']);

@@ -19,7 +19,7 @@ if (!$reqId) {
     redirect(BASE_URL . '/dashboard.php');
 }
 
-$req = fetchOne("SELECT * FROM requisitions WHERE id = ?", [$reqId]);
+$req = fetchOne("SELECT * FROM requisitions WHERE requisition_id = ?", [$reqId]);
 
 if (!$req) {
     setFlash('error', 'Requisition not found.');
@@ -27,22 +27,27 @@ if (!$req) {
 }
 
 // Only the submitter can cancel, and only while pending
-if ((int)$req['submitted_by'] !== (int)$user['id']) {
+if ((int)$req['requester_id'] !== (int)$user['user_id']) {
     setFlash('error', 'You can only cancel your own requisitions.');
     redirect(BASE_URL . '/requisitions/view.php?id=' . $reqId);
 }
 
-if ($req['status'] !== 'pending') {
+if ($req['current_status'] !== 'pending') {
     setFlash('error', 'Only pending requisitions can be cancelled.');
     redirect(BASE_URL . '/requisitions/view.php?id=' . $reqId);
 }
 
 query(
-    "UPDATE requisitions SET status = 'cancelled', updated_at = NOW() WHERE id = ?",
-    [$reqId]
+    "UPDATE requisitions
+        SET current_status = 'cancelled',
+            cancelled_by   = ?,
+            cancelled_at   = NOW(),
+            updated_at     = NOW()
+      WHERE requisition_id = ?",
+    [$user['user_id'], $reqId]
 );
 
 auditLog('CANCEL', 'requisitions', $reqId, 'Cancelled by requester');
 
-setFlash('success', $req['req_number'] . ' has been cancelled.');
+setFlash('success', $req['requisition_number'] . ' has been cancelled.');
 redirect(BASE_URL . '/dashboard.php');

@@ -58,7 +58,7 @@ function timeAgo(string $date): string {
 // ── Currency ──────────────────────────────────────────────────────────────
  
 /**
- * Format a number as Kenyan Shillings: KES 12,500.00
+ * Format a number as Kenyan Shillings eg. KES 12,500.00
  */
 function formatKES(float $amount): string {
     return 'KES ' . number_format($amount, 2);
@@ -67,7 +67,7 @@ function formatKES(float $amount): string {
 // ── Badge HTML ────────────────────────────────────────────────────────────
  
 /**
- * Return a styled <span> badge for a requisition status.
+ * Return a styled badge for a requisition status.
  */
 function statusBadge(string $status): string {
     $classes = [
@@ -83,7 +83,7 @@ function statusBadge(string $status): string {
 }
  
 /**
- * Return a styled <span> badge for priority.
+ * Return a styled badge for priority.
  */
 function priorityBadge(string $priority): string {
     $classes = [
@@ -97,9 +97,6 @@ function priorityBadge(string $priority): string {
  
 // ── Approval level labels ─────────────────────────────────────────────────
  
-/**
- * Human-readable name for each approval level (matches your 4-level chain).
- */
 function approvalLevelLabel(int $level): string {
     $labels = [
         1 => 'Dept Head',
@@ -139,10 +136,10 @@ function renderFlash(): void {
  * Call this whenever something important changes in the system.
  */
 function auditLog(string $action, string $table, int $recordId, string $details = ''): void {
-    $userId = $_SESSION['user']['id'] ?? null;
+    $userId = $_SESSION['user']['user_id'] ?? $_SESSION['user']['id'] ?? null;
     $ip     = $_SERVER['REMOTE_ADDR'] ?? '';
     query(
-        "INSERT INTO audit_log (user_id, action, table_name, record_id, details, ip_address)
+        "INSERT INTO audit_log (user_id, action_type, table_affected, record_id, description, ip_address)
          VALUES (?, ?, ?, ?, ?, ?)",
         [$userId, $action, $table, $recordId, $details, $ip]
     );
@@ -167,87 +164,110 @@ function get(string $key, string $default = ''): string {
 // ── Approval helpers ──────────────────────────────────────────────────────
  
 /**
- * Map a role string to its approval level integer.
- * Returns 0 if the role has no approval power.
+ * Get a user's approval level (1-4) from their user array.
+ * Reads the pre-computed value stored in session, or computes it fresh.
+ * Returns 0 if the user has no approval authority.
+ *
+ * Role logic (matches seed data):
+ *   role_id=2 (HR Admin)  → Level 2
+ *   role_id=3 (Approver)  → Level 1 if section contains 'Dept Head'
+ *                         → Level 3 if department_id = 3 (Finance)
+ *                         → Level 4 otherwise (MD)
+ *   role_id=1,4           → 0 (no approval authority)
  */
-function getRoleLevel(string $role): int {
-    $map = [
-        'dept_head'         => 1,
-        'hr_director'       => 2,
-        'finance_director'  => 3,
-        'managing_director' => 4,
-    ];
-    return $map[$role] ?? 0;
+function getRoleLevel(array $user): int {
+    // Fast path: pre-computed at login
+    if (isset($user['approval_level'])) return (int)$user['approval_level'];
+ 
+    $roleId  = (int)($user['role_id'] ?? 0);
+    $section = $user['section'] ?? '';
+    $deptId  = (int)($user['department_id'] ?? 0);
+ 
+    if ($roleId === 2) return 2;
+    if ($roleId === 3) {
+        if ($section && stripos($section, 'Dept Head') !== false) return 1;
+        if ($deptId === 3) return 3;
+        return 4;
+    }
+    return 0;
 }
  
 /**
- * Map an approval level back to the role string expected at that level.
- */
-function getLevelRole(int $level): string {
-    $map = [
-        1 => 'dept_head',
-        2 => 'hr_director',
-        3 => 'finance_director',
-        4 => 'managing_director',
-    ];
-    return $map[$level] ?? '';
-}
- 
-/**
- * Find the approver user for a given level.
- * Level 1 (dept head) is department-scoped.
- * Levels 2-4 are company-wide roles.
+ * Find the next approver user for a given level.
+ * SCHEMA: users columns are user_id, full_name, email, role_id, section, department_id
  */
 function getNextApprover(int $level, int $deptId): ?array {
-    $role = getLevelRole($level);
-    if (!$role) return null;
- 
     if ($level === 1) {
+        // Dept Head — scoped to the requisition's department
         return fetchOne(
-            "SELECT id, name, email FROM users WHERE role = ? AND department_id = ? LIMIT 1",
-            [$role, $deptId]
+            "SELECT user_id, full_name, email FROM users
+              WHERE role_id = 3 AND department_id = ? AND section LIKE '%Dept Head%'
+              LIMIT 1",
+            [$deptId]
         ) ?: null;
     }
- 
-    return fetchOne(
-        "SELECT id, name, email FROM users WHERE role = ? LIMIT 1",
-        [$role]
-    ) ?: null;
+    if ($level === 2) {
+        // HR Admin (role_id = 2)
+        return fetchOne(
+            "SELECT user_id, full_name, email FROM users WHERE role_id = 2 LIMIT 1"
+        ) ?: null;
+    }
+    if ($level === 3) {
+        // Finance Director: Approver in Finance dept (dept_id=3) with no Dept Head section
+        return fetchOne(
+            "SELECT user_id, full_name, email FROM users
+              WHERE role_id = 3 AND department_id = 3
+                AND (section IS NULL OR section NOT LIKE '%Dept Head%')
+              LIMIT 1"
+        ) ?: null;
+    }
+    if ($level === 4) {
+        // Managing Director: Approver, not Finance, no Dept Head section
+        return fetchOne(
+            "SELECT user_id, full_name, email FROM users
+              WHERE role_id = 3
+                AND (section IS NULL OR section NOT LIKE '%Dept Head%')
+                AND department_id != 3
+              LIMIT 1"
+        ) ?: null;
+    }
+    return null;
 }
  
 /**
- * Build and fire the "advance or finalise" logic after an approval decision.
- *
- * $action   — 'approve' | 'reject'
- * $reqId    — requisition primary key
- * $approverId — the acting user's ID
- * $comments — optional free-text reason
+ * Process an approve or reject decision.
+ * SCHEMA changes from old:
+ *   requisitions:      id→requisition_id, req_number→requisition_number,
+ *                      submitted_by→requester_id, status→current_status
+ *   approval_history:  approval_level→level_id, decided_at→decision_date
+ *   notifications:     added notification_type column
+ *   audit_log:         action→action_type, table_name→table_affected, details→description
  */
 function processApprovalDecision(string $action, int $reqId, int $approverId, string $comments = ''): void {
  
-    // Load the requisition
-    $req = fetchOne("SELECT * FROM requisitions WHERE id = ?", [$reqId]);
+    // Load the requisition using new PK column name
+    $req = fetchOne("SELECT * FROM requisitions WHERE requisition_id = ?", [$reqId]);
     if (!$req) return;
  
     $currentLevel = (int)$req['current_approval_level'];
-    $reqNumber    = $req['req_number'];
-    $submitterId  = (int)$req['submitted_by'];
+    $reqNumber    = $req['requisition_number'];   // was req_number
+    $submitterId  = (int)$req['requester_id'];     // was submitted_by
     $deptId       = (int)$req['department_id'];
  
-    // 1. Record decision in approval_history
-    //    Update existing pending row, or insert if missing (safety net).
+    // 1. Record decision — update existing pending row in approval_history
+    //    level_id now maps 1:1 to level number (level_id=1 = level 1, etc.)
     $updated = query(
         "UPDATE approval_history
-            SET decision = ?, comments = ?, decided_at = NOW()
-          WHERE requisition_id = ? AND approval_level = ? AND decision = 'pending'",
+            SET decision = ?, comments = ?, decision_date = NOW()   -- was decided_at
+          WHERE requisition_id = ? AND level_id = ? AND decision = 'pending'",  // was approval_level
         [$action === 'approve' ? 'approved' : 'rejected', $comments, $reqId, $currentLevel]
     );
  
+    // Safety net: insert row if it didn't exist
     if ($updated->rowCount() === 0) {
-        // No pending row existed — create one retroactively
         query(
             "INSERT INTO approval_history
-               (requisition_id, approver_id, approval_level, decision, comments, decided_at)
+               (requisition_id, approver_id, level_id, decision, comments, decision_date)
              VALUES (?, ?, ?, ?, ?, NOW())",
             [$reqId, $approverId, $currentLevel, $action === 'approve' ? 'approved' : 'rejected', $comments]
         );
@@ -256,12 +276,17 @@ function processApprovalDecision(string $action, int $reqId, int $approverId, st
     // 2. Branch on decision
     if ($action === 'reject') {
  
+        // Update status + surface rejection_reason at requisition level
         query(
-            "UPDATE requisitions SET status = 'rejected', updated_at = NOW() WHERE id = ?",
-            [$reqId]
+            "UPDATE requisitions
+                SET current_status = 'rejected', rejection_reason = ?, updated_at = NOW()
+              WHERE requisition_id = ?",
+            [$comments, $reqId]
         );
+        // Notify requester — notification_type added in new schema
         query(
-            "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+            "INSERT INTO notifications (user_id, requisition_id, notification_type, message)
+             VALUES (?, ?, 'rejection', ?)",
             [
                 $submitterId, $reqId,
                 "Your requisition {$reqNumber} was rejected at " . approvalLevelLabel($currentLevel) . ".",
@@ -273,42 +298,48 @@ function processApprovalDecision(string $action, int $reqId, int $approverId, st
         // Approved
         if ($currentLevel < 4) {
  
-            // Advance to next level
             $nextLevel    = $currentLevel + 1;
             $nextApprover = getNextApprover($nextLevel, $deptId);
  
             query(
-                "UPDATE requisitions SET current_approval_level = ?, updated_at = NOW() WHERE id = ?",
+                "UPDATE requisitions SET current_approval_level = ?, updated_at = NOW()
+                  WHERE requisition_id = ?",
                 [$nextLevel, $reqId]
             );
  
             if ($nextApprover) {
-                // Create a pending approval_history row for the next approver
+                // Pending row for next approver — level_id = level number (1:1 in seed)
                 query(
-                    "INSERT INTO approval_history
-                       (requisition_id, approver_id, approval_level, decision)
+                    "INSERT INTO approval_history (requisition_id, approver_id, level_id, decision)
                      VALUES (?, ?, ?, 'pending')",
-                    [$reqId, $nextApprover['id'], $nextLevel]
+                    [$reqId, $nextApprover['user_id'], $nextLevel]  // was $nextApprover['id']
                 );
                 query(
-                    "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+                    "INSERT INTO notifications (user_id, requisition_id, notification_type, message)
+                     VALUES (?, ?, 'approval', ?)",
                     [
-                        $nextApprover['id'], $reqId,
-                        "{$reqNumber} has been approved by " . approvalLevelLabel($currentLevel)
-                        . " and now requires your approval (Level {$nextLevel}).",
+                        $nextApprover['user_id'], $reqId,
+                        "{$reqNumber} approved by " . approvalLevelLabel($currentLevel)
+                        . " — requires your approval (Level {$nextLevel}).",
                     ]
                 );
             }
             auditLog('APPROVE', 'requisitions', $reqId, "Approved at level {$currentLevel}, advanced to {$nextLevel}");
  
         } else {
-            // Level 4 approved — fully approved
+            // Level 4 — final approval
             query(
-                "UPDATE requisitions SET status = 'approved', updated_at = NOW() WHERE id = ?",
-                [$reqId]
+                "UPDATE requisitions
+                    SET current_status = 'approved',
+                        final_approver_id = ?,
+                        final_decision_date = NOW(),
+                        updated_at = NOW()
+                  WHERE requisition_id = ?",
+                [$approverId, $reqId]
             );
             query(
-                "INSERT INTO notifications (user_id, requisition_id, message) VALUES (?, ?, ?)",
+                "INSERT INTO notifications (user_id, requisition_id, notification_type, message)
+                 VALUES (?, ?, 'approval', ?)",
                 [
                     $submitterId, $reqId,
                     "Congratulations! Your requisition {$reqNumber} has been fully approved.",

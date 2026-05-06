@@ -7,8 +7,10 @@ require_once __DIR__ . '/../includes/auth.php';
 
 requireLogin();
 
-// Only approvers and admin can view the audit log
-if (!hasRole('dept_head','hr_director','finance_director','managing_director','admin')) {
+// Only approvers(level > 0) and admin can view the audit log
+$userLevel = getRoleLevel(currentUser());
+$isAdmin   = (currentUser()['role_id'] ?? 0) == 1;
+if ($userLevel === 0 && !$isAdmin) {
     setFlash('error', 'Access denied.');
     redirect(BASE_URL . '/dashboard.php');
 }
@@ -24,11 +26,11 @@ $where  = ['1=1'];
 $params = [];
 
 if ($filterAction) {
-    $where[]  = 'al.action = ?';
+    $where[]  = 'al.action_type = ?';
     $params[] = $filterAction;
 }
 if ($filterUser) {
-    $where[]  = 'u.name LIKE ?';
+    $where[]  = 'u.full_name LIKE ?';
     $params[] = "%{$filterUser}%";
 }
 
@@ -37,17 +39,17 @@ $whereSQL = implode(' AND ', $where);
 $total = (int)(fetchOne(
     "SELECT COUNT(*) AS cnt
        FROM audit_log al
-       LEFT JOIN users u ON u.id = al.user_id
+       LEFT JOIN users u ON u.user_id = al.user_id
       WHERE {$whereSQL}",
     $params
 )['cnt'] ?? 0);
 
 $logs = fetchAll(
-    "SELECT al.*, u.name AS actor_name
+    "SELECT al.*, u.full_name AS actor_name
        FROM audit_log al
-       LEFT JOIN users u ON u.id = al.user_id
+       LEFT JOIN users u ON u.user_id = al.user_id
       WHERE {$whereSQL}
-      ORDER BY al.created_at DESC
+      ORDER BY al.timestamp DESC            
       LIMIT {$perPage} OFFSET {$offset}",
     $params
 );
@@ -107,29 +109,29 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($logs as $log): ?>
             <tr>
               <td style="white-space:nowrap;color:var(--text-muted)">
-                <?= e(date('d/m/Y H:i', strtotime($log['created_at']))) ?>
+                <?= e(date('d/m/Y H:i', strtotime($log['timestamp']))) ?>
               </td>
               <td><?= e($log['actor_name'] ?? 'System') ?></td>
               <td>
-                <span class="audit-action <?= e($log['action']) ?>">
-                  <?= e($log['action']) ?>
+                <span class="audit-action <?= e($log['action_type']) ?>">
+                  <?= e($log['action_type']) ?>
                 </span>
               </td>
               <td>
-                <?php if ($log['table_name'] === 'requisitions' && $log['record_id']): ?>
+                <?php if ($log['table_affected'] === 'requisitions' && $log['record_id']): ?>
                   <a href="<?= BASE_URL ?>/requisitions/view.php?id=<?= (int)$log['record_id'] ?>"
                      style="color:#2980B9;font-size:13px">
-                    <?= e($log['table_name']) ?> #<?= (int)$log['record_id'] ?>
+                    <?= e($log['table_affected']) ?> #<?= (int)$log['record_id'] ?>
                   </a>
                 <?php else: ?>
                   <span style="font-size:13px;color:var(--text-muted)">
-                    <?= e($log['table_name'] ?? '—') ?>
+                    <?= e($log['table_affected'] ?? '—') ?>
                     <?= $log['record_id'] ? '#' . (int)$log['record_id'] : '' ?>
                   </span>
                 <?php endif; ?>
               </td>
               <td style="font-size:13px;color:var(--text-muted);max-width:240px">
-                <?= e(mb_strimwidth($log['details'] ?? '', 0, 80, '…')) ?>
+                <?= e(mb_strimwidth($log['description'] ?? '', 0, 80, '…')) ?>
               </td>
               <td style="font-size:12px;color:var(--text-muted);font-family:monospace">
                 <?= e($log['ip_address'] ?? '') ?>

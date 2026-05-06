@@ -16,11 +16,11 @@ if (!$reqId) {
 }
 
 $req = fetchOne(
-    "SELECT r.*, u.name AS submitter_name, u.email AS submitter_email,
-            d.name AS dept_name, s.name AS section_name
+    "SELECT r.*, u.username AS submitter_name, u.email AS submitter_email,
+            d.department_name AS dept_name, s.name AS section_name
        FROM requisitions r
-       LEFT JOIN users u ON u.id = r.submitted_by
-       LEFT JOIN departments d ON d.id = r.department_id
+       LEFT JOIN users u ON u.user_id = r.requester_id
+       LEFT JOIN departments d ON d.department_id = r.department_id
        LEFT JOIN sections s ON s.id = r.section_id
       WHERE r.id = ?",
     [$reqId]
@@ -31,7 +31,7 @@ if (!$req) {
     redirect(BASE_URL . '/dashboard.php');
 }
 
-$isOwner    = (int)$req['submitted_by'] === (int)$user['id'];
+$isOwner    = (int)$req['requester_id'] === (int)$user['id'];
 $isApprover = $userLevel > 0;
 $isAdmin    = $userRole === 'admin';
 
@@ -46,9 +46,9 @@ $items = fetchAll(
 );
 
 $approvalHistory = fetchAll(
-    "SELECT ah.*, u.name AS approver_name, u.role AS approver_role
+    "SELECT ah.*, u.username AS approver_name, u.role AS approver_role
        FROM approval_history ah
-       LEFT JOIN users u ON u.id = ah.approver_id
+       LEFT JOIN users u ON u.user_id = ah.approver_id
       WHERE ah.requisition_id = ?
       ORDER BY ah.approval_level ASC, ah.id ASC",
     [$reqId]
@@ -60,7 +60,7 @@ foreach ($approvalHistory as $ah) {
 }
 
 $canDecide = (
-    $req['status'] === 'pending'
+    $req['current_status'] === 'pending'
     && $userLevel > 0
     && (int)$req['current_approval_level'] === $userLevel
 );
@@ -93,12 +93,12 @@ for ($lvl = 1; $lvl <= 4; $lvl++) {
     $current = (int)$req['current_approval_level'];
     if ($ah && $ah['decision'] === 'approved')       $status = 'done';
     elseif ($ah && $ah['decision'] === 'rejected')   $status = 'rejected';
-    elseif ($lvl === $current && $req['status'] === 'pending') $status = 'current';
+    elseif ($lvl === $current && $req['current_status'] === 'pending') $status = 'current';
     else $status = 'waiting';
 
     $trackSteps[$lvl] = [
         'label'    => approvalLevelLabel($lvl),
-        'status'   => $status,
+        'current_status'   => $status,
         'approver' => $ah['approver_name'] ?? null,
         'date'     => $ah['decided_at']    ?? null,
         'comment'  => $ah['comments']      ?? null,
@@ -120,7 +120,7 @@ include __DIR__ . '/../includes/header.php';
     Back
   </button>
   <h1><?= e($req['req_number']) ?> Details</h1>
-  <?php if ($isOwner && $req['status'] === 'pending'): ?>
+  <?php if ($isOwner && $req['current_status'] === 'pending'): ?>
   <div class="actions-menu">
     <button class="actions-menu-btn" onclick="document.getElementById('actions-dropdown').classList.toggle('open')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
@@ -146,7 +146,7 @@ include __DIR__ . '/../includes/header.php';
 
       <!-- Status strip -->
       <div class="detail-section" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 26px">
-        <?= statusBadge($req['status']) ?>
+        <?= statusBadge($req['current_status']) ?>
         <span style="color:var(--border)">|</span>
         <span style="font-size:13px;color:var(--text-muted)">Type: <strong><?= e(REQUISITION_TYPES[$req['type']] ?? ucfirst($req['type'])) ?></strong></span>
         <span style="color:var(--border)">|</span>
@@ -230,12 +230,12 @@ include __DIR__ . '/../includes/header.php';
       <div class="sidebar-card-body">
         <div class="approval-track">
           <?php foreach ($trackSteps as $lvl => $step):
-            $dotIcon = match($step['status']) { 'done'=>'✓','rejected'=>'✕','current'=>'→',default=>'' };
-            $dotCls  = match($step['status']) { 'done','rejected'=>'done','current'=>'current',default=>'waiting' };
+            $dotIcon = match($step['current_status']) { 'done'=>'✓','rejected'=>'✕','current'=>'→',default=>'' };
+            $dotCls  = match($step['current_status']) { 'done','rejected'=>'done','current'=>'current',default=>'waiting' };
             $roleCls = $dotCls;
-            $isRejected = $step['status'] === 'rejected';
+            $isRejected = $step['current_status'] === 'rejected';
           ?>
-          <div class="approval-step <?= $step['status'] === 'done' ? 'done' : '' ?>">
+          <div class="approval-step <?= $step['current_status'] === 'done' ? 'done' : '' ?>">
             <div class="ap-step-dot <?= $dotCls ?>"
                  <?= $isRejected ? 'style="background:var(--brand);border-color:var(--brand)"' : '' ?>>
               <?= $dotIcon ?>
@@ -243,16 +243,16 @@ include __DIR__ . '/../includes/header.php';
             <div class="ap-step-info">
               <div class="ap-step-role <?= $roleCls ?>">
                 <?= e($step['label']) ?>
-                <?php if ($step['approver'] && in_array($step['status'],['done','rejected'])): ?>
+                <?php if ($step['approver'] && in_array($step['current_status'],['done','rejected'])): ?>
                   <span style="font-weight:400;color:var(--text-muted)"> — <?= e($step['approver']) ?></span>
                 <?php endif; ?>
-                <?php if ($step['status']==='current'): ?>
+                <?php if ($step['current_status']==='current'): ?>
                   <span style="font-weight:400;font-size:11px;color:var(--orange-text)"> (Pending)</span>
                 <?php endif; ?>
               </div>
               <?php if ($step['date']): ?>
                 <div class="ap-step-meta"><?= e(formatDate($step['date'],'d/m/Y H:i')) ?></div>
-              <?php elseif ($step['status']==='waiting'): ?>
+              <?php elseif ($step['current_status']==='waiting'): ?>
                 <div class="ap-step-meta">Awaiting previous approval</div>
               <?php endif; ?>
               <?php if ($step['comment']): ?>
@@ -296,7 +296,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="sidebar-card-body" style="display:flex;flex-direction:column;gap:12px">
         <div class="detail-field"><span class="df-label">Requisition ID</span><span class="df-value" style="font-family:monospace"><?= e($req['req_number']) ?></span></div>
         <div class="detail-field"><span class="df-label">Current level</span>
-          <span class="df-value"><?= $req['status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['status']) ?></span>
+          <span class="df-value"><?= $req['current_status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['status']) ?></span>
         </div>
         <div class="detail-field"><span class="df-label">Last updated</span><span class="df-value"><?= e(timeAgo($req['updated_at'] ?? $req['created_at'])) ?></span></div>
         <?php if ($req['total_amount'] > 0): ?>

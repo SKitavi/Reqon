@@ -1,4 +1,4 @@
-# Reqon — Final Test Checklist (Day 10)
+# Reqon — Test Checklist 
 ## Pre-submission end-to-end verification
 
 All passwords: **test1234**
