@@ -42,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
 
     $type       = post('type');
     $deptId     = (int)post('department_id');
-    $sectionId  = (int)post('section_id');
     $dateReq    = post('date_required');
     $priority   = post('priority', 'medium');
     $title      = post('title'); // position title (personnel) or short description
@@ -67,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
             'step'          => 2,
             'type'          => $type,
             'department_id' => $deptId,
-            'section_id'    => $sectionId,
             'date_required' => $dateReq,
             'priority'      => $priority,
             'title'         => $title,
@@ -83,20 +81,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
 // ══════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
 
-    $justification = post('justification');
+    $description = post('description');
     $type          = $_SESSION['req_form']['type'] ?? '';
 
-    if (!$justification) {
-        $errors[] = 'Please provide a justification.';
+    if (!$description) {
+        $errors[] = 'Please provide a description.';
     }
 
     // Collect line items for procurement/it_asset/merchandise
     $items       = [];
     $totalAmount = 0;
     if (in_array($type, ['procurement', 'it_asset', 'merchandise'])) {
-        $itemNames  = $_POST['item_name']   ?? [];
+        $itemNames  = $_POST['item_description']   ?? [];
         $quantities = $_POST['quantity']    ?? [];
-        $prices     = $_POST['unit_price']  ?? [];
+        $prices     = $_POST['unit_cost']  ?? [];
 
         foreach ($itemNames as $i => $name) {
             $name = trim($name);
@@ -106,9 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
             $subtotal = $qty * $price;
             $totalAmount += $subtotal;
             $items[] = [
-                'item_name'  => $name,
+                'item_description'  => $name,
                 'quantity'   => $qty,
-                'unit_price' => $price,
+                'unit_cost' => $price,
                 'subtotal'   => $subtotal,
             ];
         }
@@ -124,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     if (empty($errors)) {
         $_SESSION['req_form'] = array_merge($_SESSION['req_form'], [
             'step'            => 3,
-            'justification'   => $justification,
+            'description'   => $description,
             'items'           => $items,
             'total_amount'    => $totalAmount,
             'vacancies'       => $vacancies,
@@ -156,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         query(
             "INSERT INTO requisitions
                (requisition_id,requisition_number, requisition_type, current_status, priority, requester_id, department_id,
-                section_id, date_required, justification, total_amount, current_approval_level)
+                 date_required, description, total_amount, current_approval_level)
              VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, 1)",
             [
                 $reqNumber,
@@ -164,25 +162,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
                 $form['priority'],
                 $user['id'],
                 $form['department_id'] ?: null,
-                $form['section_id']    ?: null,
                 $form['date_required'],
-                $form['justification'],
+                $form['description'],
                 $form['total_amount']  ?? 0,
             ]
         );
 
         $reqId = lastInsertId();
 
-        // Also save the req_number back into the row (race-condition-safe)
-        query("UPDATE requisitions SET req_number = ? WHERE id = ?", [$reqNumber, $reqId]);
+        // Also save the requisition_number back into the row (race-condition-safe)
+        query("UPDATE requisitions SET requisition_number = ? WHERE requisition_id = ?", [$reqNumber, $reqId]);
 
         // Insert line items (procurement / IT asset / merchandise)
         if (!empty($form['items'])) {
             foreach ($form['items'] as $item) {
                 query(
-                    "INSERT INTO requisition_items (requisition_id, item_name, quantity, unit_price)
+                    "INSERT INTO requisition_items (requisition_id, item_description, quantity, unit_cost)
                      VALUES (?, ?, ?, ?)",
-                    [$reqId, $item['item_name'], $item['quantity'], $item['unit_price']]
+                    [$reqId, $item['item_description'], $item['quantity'], $item['unit_cost']]
                 );
             }
         }
@@ -190,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
         // Create approval_history row for level 1 approver (Dept Head)
         // We look up the dept head for this department
         $deptHead = fetchOne(
-            "SELECT id FROM users WHERE department_id = ? AND role = 'dept_head' LIMIT 1",
+            "SELECT user_id FROM users WHERE department_id = ? AND role = 'dept_head' LIMIT 1",
             [$form['department_id']]
         );
         $approverId = $deptHead['id'] ?? null;
@@ -234,10 +231,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
 }
 
 // ── Load sections for the currently selected department (step 1) ──────────
-$selectedDept = $_SESSION['req_form']['department_id'] ?? 0;
+/*$selectedDept = $_SESSION['req_form']['department_id'] ?? 0;
 $sections = $selectedDept
     ? fetchAll("SELECT id, name FROM sections WHERE department_id = ? ORDER BY name", [$selectedDept])
     : [];
+*/
 
 // ── Pull saved step data for pre-filling fields ───────────────────────────
 $form = $_SESSION['req_form'] ?? [];
@@ -245,14 +243,10 @@ $form = $_SESSION['req_form'] ?? [];
 // ── Department name lookup for review step ────────────────────────────────
 $deptName = '';
 if (!empty($form['department_id'])) {
-    $d = fetchOne("SELECT name FROM departments WHERE id = ?", [$form['department_id']]);
-    $deptName = $d['name'] ?? '';
+    $d = fetchOne("SELECT department_name FROM departments WHERE department_id = ?", [$form['department_id']]);
+    $deptName = $d['department_name'] ?? '';
 }
-$sectionName = '';
-if (!empty($form['section_id'])) {
-    $s = fetchOne("SELECT name FROM sections WHERE id = ?", [$form['section_id']]);
-    $sectionName = $s['name'] ?? '';
-}
+
 
 $pageTitle = 'New Requisition';
 include __DIR__ . '/../includes/header.php';
@@ -351,31 +345,25 @@ include __DIR__ . '/../includes/header.php';
       <!-- Department -->
       <div class="field">
         <label for="department_id">Department <span class="required">*</span></label>
-        <select id="department_id" name="department_id" required
-                onchange="loadSections(this.value)">
+        <select id="department_id" name="department_name" >
           <option value="">Select Department</option>
           <?php foreach ($departments as $dept): ?>
-            <option value="<?= $dept['id'] ?>"
-              <?= (int)($form['department_id'] ?? 0) === (int)$dept['id'] ? 'selected' : '' ?>>
-              <?= e($dept['name']) ?>
+            <option value="<?= $dept['department_id'] ?>"
+              <?= (int)($form['department_id'] ?? 0) === (int)$dept['department_id'] ? 'selected' : '' ?>>
+              <?= e($dept['department_name']) ?>
             </option>
           <?php endforeach; ?>
         </select>
       </div>
 
-      <!-- Section (loaded dynamically by JS when dept selected) -->
+      <!-- Section (loaded dynamically by JS when dept selected) 
       <div class="field">
         <label for="section_id">Section</label>
         <select id="section_id" name="section_id">
           <option value="">Select Section</option>
-          <?php foreach ($sections as $sec): ?>
-            <option value="<?= $sec['id'] ?>"
-              <?= (int)($form['section_id'] ?? 0) === (int)$sec['id'] ? 'selected' : '' ?>>
-              <?= e($sec['name']) ?>
-            </option>
-          <?php endforeach; ?>
+
         </select>
-      </div>
+      </div>-->
 
       <!-- Date Required -->
       <div class="field">
@@ -452,21 +440,21 @@ include __DIR__ . '/../includes/header.php';
           <tbody id="items-body">
             <?php
             // Pre-fill if coming back from step 3
-            $savedItems = $form['items'] ?? [['item_name'=>'','quantity'=>1,'unit_price'=>0]];
+            $savedItems = $form['items'] ?? [['item_description'=>'','quantity'=>1,'unit_cost'=>0]];
             foreach ($savedItems as $item): ?>
             <tr>
-              <td><input type="text" name="item_name[]"
-                         value="<?= e($item['item_name']) ?>"
+              <td><input type="text" name="item_description[]"
+                         value="<?= e($item['item_description']) ?>"
                          placeholder="Describe the item"
                          oninput="recalcRow(this)" required></td>
               <td><input type="number" name="quantity[]" min="1"
                          value="<?= (int)$item['quantity'] ?>"
                          oninput="recalcRow(this)" style="text-align:center"></td>
-              <td><input type="number" name="unit_price[]" min="0" step="0.01"
-                         value="<?= number_format((float)$item['unit_price'], 2, '.', '') ?>"
+              <td><input type="number" name="unit_cost[]" min="0" step="0.01"
+                         value="<?= number_format((float)$item['unit_cost'], 2, '.', '') ?>"
                          oninput="recalcRow(this)" placeholder="0.00"></td>
               <td class="subtotal-cell">
-                KES <?= number_format((float)($item['unit_price'] ?? 0) * (int)($item['quantity'] ?? 1), 2) ?>
+                KES <?= number_format((float)($item['unit_cost'] ?? 0) * (int)($item['quantity'] ?? 1), 2) ?>
               </td>
               <td><button type="button" class="remove-row" onclick="removeRow(this)" title="Remove">×</button></td>
             </tr>
@@ -514,12 +502,12 @@ include __DIR__ . '/../includes/header.php';
       </div>
       <?php endif; ?>
 
-      <!-- Justification (all types) -->
+      <!-- description (all types) -->
       <div class="field">
-        <label for="justification">Justification <span class="required">*</span></label>
-        <textarea id="justification" name="justification"
+        <label for="description"> Description <span class="required">*</span></label>
+        <textarea id="description" name="description"
                   placeholder="Explain why this requisition is needed..."
-                  rows="4"><?= e($form['justification'] ?? '') ?></textarea>
+                  rows="4"><?= e($form['description'] ?? '') ?></textarea>
         <p class="field-hint">Be specific — this text is visible to all approvers.</p>
       </div>
 
@@ -604,9 +592,9 @@ include __DIR__ . '/../includes/header.php';
           <tbody>
             <?php foreach ($form['items'] as $item): ?>
             <tr>
-              <td><?= e($item['item_name']) ?></td>
+              <td><?= e($item['item_description']) ?></td>
               <td><?= (int)$item['quantity'] ?></td>
-              <td><?= formatKES((float)$item['unit_price']) ?></td>
+              <td><?= formatKES((float)$item['unit_cost']) ?></td>
               <td style="text-align:right"><?= formatKES((float)$item['subtotal']) ?></td>
             </tr>
             <?php endforeach; ?>
@@ -623,11 +611,11 @@ include __DIR__ . '/../includes/header.php';
       </div>
       <?php endif; ?>
 
-      <!-- Review: Justification -->
+      <!-- Review: description -->
       <div class="review-section">
-        <h2 class="review-section-title">Justification</h2>
+        <h2 class="review-section-title">Description</h2>
         <p style="font-size:14px;line-height:1.7;color:var(--text)">
-          <?= nl2br(e($form['justification'] ?? '—')) ?>
+          <?= nl2br(e($form['description'] ?? '—')) ?>
         </p>
       </div>
 
@@ -672,7 +660,7 @@ function handleTypeChange(type) {
 }
 
 // ── Load sections via AJAX when department changes ────────────────────────
-function loadSections(deptId) {
+/*function loadSections(deptId) {
   const select = document.getElementById('section_id');
   if (!select) return;
   select.innerHTML = '<option value="">Loading…</option>';
@@ -682,7 +670,7 @@ function loadSections(deptId) {
     return;
   }
 
-  fetch('<?= BASE_URL ?>/api/sections.php?department_id=' + encodeURIComponent(deptId))
+  fetch('/api/sections.php?department_id=' + encodeURIComponent(deptId))
     .then(r => r.json())
     .then(data => {
       select.innerHTML = '<option value="">Select Section</option>';
@@ -696,7 +684,7 @@ function loadSections(deptId) {
     .catch(() => {
       select.innerHTML = '<option value="">Select Section</option>';
     });
-}
+}*/
 
 // ── Lead time warning ─────────────────────────────────────────────────────
 function showLeadTimeWarning(dateVal) {
@@ -723,11 +711,11 @@ function addItemRow() {
   if (!tbody) return;
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="text" name="item_name[]" placeholder="Describe the item"
+    <td><input type="text" name="item_description[]" placeholder="Describe the item"
                oninput="recalcRow(this)" required></td>
     <td><input type="number" name="quantity[]" min="1" value="1"
                oninput="recalcRow(this)" style="text-align:center"></td>
-    <td><input type="number" name="unit_price[]" min="0" step="0.01" placeholder="0.00"
+    <td><input type="number" name="unit_cost[]" min="0" step="0.01" placeholder="0.00"
                oninput="recalcRow(this)"></td>
     <td class="subtotal-cell">KES 0.00</td>
     <td><button type="button" class="remove-row" onclick="removeRow(this)" title="Remove">×</button></td>`;
@@ -746,7 +734,7 @@ function removeRow(btn) {
 function recalcRow(input) {
   const row    = input.closest('tr');
   const qty    = parseFloat(row.querySelector('[name="quantity[]"]')?.value) || 0;
-  const price  = parseFloat(row.querySelector('[name="unit_price[]"]')?.value) || 0;
+  const price  = parseFloat(row.querySelector('[name="unit_cost[]"]')?.value) || 0;
   const sub    = qty * price;
   const cell   = row.querySelector('.subtotal-cell');
   if (cell) cell.textContent = 'KES ' + sub.toLocaleString('en-KE', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -757,7 +745,7 @@ function recalcGrandTotal() {
   let total = 0;
   document.querySelectorAll('#items-body tr').forEach(row => {
     const qty   = parseFloat(row.querySelector('[name="quantity[]"]')?.value) || 0;
-    const price = parseFloat(row.querySelector('[name="unit_price[]"]')?.value) || 0;
+    const price = parseFloat(row.querySelector('[name="unit_cost[]"]')?.value) || 0;
     total += qty * price;
   });
   const el = document.getElementById('grand-total');

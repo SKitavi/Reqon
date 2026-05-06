@@ -21,8 +21,7 @@ $req = fetchOne(
        FROM requisitions r
        LEFT JOIN users u ON u.user_id = r.requester_id
        LEFT JOIN departments d ON d.department_id = r.department_id
-       LEFT JOIN sections s ON s.id = r.section_id
-      WHERE r.id = ?",
+      WHERE r.requisition_id = ?",
     [$reqId]
 );
 
@@ -79,8 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canDecide) {
         processApprovalDecision($action, $reqId, (int)$user['id'], $comments);
         $nextLvl = (int)$req['current_approval_level'] + 1;
         $msg = $action === 'approve'
-            ? ($nextLvl > 4 ? $req['req_number'] . ' fully approved.' : $req['req_number'] . ' approved — forwarded to ' . approvalLevelLabel($nextLvl) . '.')
-            : $req['req_number'] . ' has been rejected.';
+            ? ($nextLvl > 4 ? $req['requisition_number'] . ' fully approved.' : $req['requisition_number'] . ' approved — forwarded to ' . approvalLevelLabel($nextLvl) . '.')
+            : $req['requisition_number'] . ' has been rejected.';
         setFlash('success', $msg);
         redirect(BASE_URL . '/requisitions/view.php?id=' . $reqId);
     }
@@ -107,7 +106,7 @@ for ($lvl = 1; $lvl <= 4; $lvl++) {
 
 $historyWithComments = array_filter($approvalHistory, fn($ah) => !empty(trim($ah['comments'] ?? '')));
 
-$pageTitle = ($req['req_number'] ?? 'REQ') . ' Details';
+$pageTitle = ($req['requisition_number'] ?? 'REQ') . ' Details';
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-wrap">
@@ -119,7 +118,7 @@ include __DIR__ . '/../includes/header.php';
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
     Back
   </button>
-  <h1><?= e($req['req_number']) ?> Details</h1>
+  <h1><?= e($req['requisition_number']) ?> Details</h1>
   <?php if ($isOwner && $req['current_status'] === 'pending'): ?>
   <div class="actions-menu">
     <button class="actions-menu-btn" onclick="document.getElementById('actions-dropdown').classList.toggle('open')">
@@ -128,7 +127,7 @@ include __DIR__ . '/../includes/header.php';
     </button>
     <div class="actions-dropdown" id="actions-dropdown">
       <form method="POST" action="<?= BASE_URL ?>/api/cancel_requisition.php"
-            onsubmit="return confirm('Cancel <?= e($req['req_number']) ?>?')">
+            onsubmit="return confirm('Cancel <?= e($req['requisition_number']) ?>?')">
         <input type="hidden" name="requisition_id" value="<?= $reqId ?>">
         <button type="submit" class="danger">Cancel Requisition</button>
       </form>
@@ -179,10 +178,10 @@ include __DIR__ . '/../includes/header.php';
           <tbody>
             <?php foreach ($items as $it): ?>
             <tr>
-              <td><?= e($it['item_name']) ?></td>
+              <td><?= e($it['item_description']) ?></td>
               <td style="text-align:center"><?= (int)$it['quantity'] ?></td>
-              <td style="text-align:right"><?= formatKES((float)$it['unit_price']) ?></td>
-              <td style="text-align:right"><?= formatKES((float)$it['unit_price'] * (int)$it['quantity']) ?></td>
+              <td style="text-align:right"><?= formatKES((float)$it['unit_cost']) ?></td>
+              <td style="text-align:right"><?= formatKES((float)$it['unit_cost'] * (int)$it['quantity']) ?></td>
             </tr>
             <?php endforeach; ?>
           </tbody>
@@ -191,10 +190,10 @@ include __DIR__ . '/../includes/header.php';
       </div>
       <?php endif; ?>
 
-      <!-- Justification -->
+      <!-- description -->
       <div class="detail-section">
-        <h2 class="detail-section-title">Justification</h2>
-        <p style="font-size:14px;line-height:1.8"><?= nl2br(e($req['justification'] ?? '—')) ?></p>
+        <h2 class="detail-section-title">Description</h2>
+        <p style="font-size:14px;line-height:1.8"><?= nl2br(e($req['description'] ?? '—')) ?></p>
       </div>
 
       <!-- Comments history -->
@@ -275,7 +274,7 @@ include __DIR__ . '/../includes/header.php';
           <textarea name="comments" placeholder="Add a comment (required when rejecting)…" rows="3"></textarea>
           <div class="decision-btns">
             <button type="submit" name="action" value="approve" class="btn btn-dark"
-                    onclick="return confirm('Approve <?= e($req['req_number']) ?>?')">
+                    onclick="return confirm('Approve <?= e($req['requisition_number']) ?>?')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
               Approve
             </button>
@@ -294,7 +293,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="sidebar-card">
       <div class="sidebar-card-header">Quick info</div>
       <div class="sidebar-card-body" style="display:flex;flex-direction:column;gap:12px">
-        <div class="detail-field"><span class="df-label">Requisition ID</span><span class="df-value" style="font-family:monospace"><?= e($req['req_number']) ?></span></div>
+        <div class="detail-field"><span class="df-label">Requisition ID</span><span class="df-value" style="font-family:monospace"><?= e($req['requisition_number']) ?></span></div>
         <div class="detail-field"><span class="df-label">Current level</span>
           <span class="df-value"><?= $req['current_status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['status']) ?></span>
         </div>
@@ -316,7 +315,7 @@ function validateReject(form) {
     form.querySelector('textarea').focus();
     return false;
   }
-  return confirm('Reject <?= e($req['req_number']) ?>? This will notify the requester.');
+  return confirm('Reject <?= e($req['requisition_number']) ?>? This will notify the requester.');
 }
 document.addEventListener('click', function(e) {
   const menu = document.querySelector('.actions-menu');

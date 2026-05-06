@@ -237,7 +237,7 @@ function getNextApprover(int $level, int $deptId): ?array {
 /**
  * Process an approve or reject decision.
  * SCHEMA changes from old:
- *   requisitions:      id→requisition_id, req_number→requisition_number,
+ *   requisitions:      id→requisition_id, requisition_number→requisition_number,
  *                      submitted_by→requester_id, status→current_status
  *   approval_history:  approval_level→level_id, decided_at→decision_date
  *   notifications:     added notification_type column
@@ -250,7 +250,7 @@ function processApprovalDecision(string $action, int $reqId, int $approverId, st
     if (!$req) return;
  
     $currentLevel = (int)$req['current_approval_level'];
-    $reqNumber    = $req['requisition_number'];   // was req_number
+    $reqNumber    = $req['requisition_number'];   // was requisition_number
     $submitterId  = (int)$req['requester_id'];     // was submitted_by
     $deptId       = (int)$req['department_id'];
  

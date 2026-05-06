@@ -32,7 +32,7 @@ $params = [];
 // Staff only see their own
 if (!$isApprover) {
     $where[]  = 'r.requester_id = ?';
-    $params[] = (int)$user['id'];
+    $params[] = (int)$user['user_id'];
 }
 
 if ($search) {
@@ -268,7 +268,7 @@ include __DIR__ . '/../includes/header.php';
                 <?= e(formatDate($req['date_required'])) ?>
               </td>
               <td class="text-muted" style="white-space:nowrap">
-                <?= e(timeAgo($req['submission_date'] ?? $req['created_at'])) ?>
+                <?= e(timeAgo($req['submission_date'] ?? $req['created_date'])) ?>
               </td>
               <td>
                 <a href="<?= BASE_URL ?>/requisitions/view.php?id=<?= (int)$req['requisition_id'] ?>"

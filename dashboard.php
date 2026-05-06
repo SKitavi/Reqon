@@ -28,7 +28,7 @@ if ($isApprover) {
                 SUM(current_status='approved') AS approved,
                 SUM(current_status='rejected') AS rejected
            FROM requisitions
-          WHERE requester_id = ?"          // was submitted_by
+          WHERE requester_id = ?"          
     );
     $statsStmt->execute([$uid]);
 }
@@ -39,7 +39,7 @@ if ($isApprover) {
     $recentStmt = getDB()->query(
         "SELECT r.*,
                 d.department_name AS dept_name,
-                u.full_name       AS submitter_name    -- was username / name
+                u.full_name       AS submitter_name    
            FROM requisitions r
            LEFT JOIN departments d ON d.department_id = r.department_id
            LEFT JOIN users      u ON u.user_id         = r.requester_id
