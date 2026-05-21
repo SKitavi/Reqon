@@ -8,7 +8,8 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user      = currentUser();
-$userLevel = getRoleLevel($user);  
+$userLevel = getRoleLevel($user);
+$uid       = (int)$user['user_id'];
 
 // Non-approvers have no business here
 if ($userLevel === 0) {
@@ -29,6 +30,15 @@ $highlight = (int)get('highlight'); // scroll to this card after a redirect
 // ── Build query ───────────────────────────────────────────────────────────
 $where  = ["r.current_status = 'pending'", "r.current_approval_level = ?"];
 $params = [$userLevel];
+
+// Procurement Head (user 7) at level 2 only sees non-personnel types
+if ($uid === APPROVER_PROCUREMENT_HEAD && $userLevel === 2) {
+    $where[] = "r.requisition_type IN ('procurement','it_asset','merchandise')";
+}
+// HR Director (user 8) at level 2 only sees personnel
+if ($uid === APPROVER_HR_DIRECTOR && $userLevel === 2) {
+    $where[] = "r.requisition_type = 'personnel'";
+}
 
 if ($search) {
     $where[]  = "(r.requisition_number LIKE ? OR u.full_name LIKE ? OR r.description LIKE ?)";

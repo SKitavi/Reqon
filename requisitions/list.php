@@ -13,27 +13,40 @@ $userRole  = $user['role_name'] ?? '';
 $userLevel = getRoleLevel($user);
 $isAdmin   = strtolower($userRole) === 'system admin';
 $isApprover = $userLevel > 0 || $isAdmin;
+$uid       = (int)$user['user_id'];
+$deptId    = (int)($user['department_id'] ?? 0);
 
 // ── Filters ───────────────────────────────────────────────
-$search      = trim(get('q'));
-$filterType  = get('type');
-$filterStatus= get('status');
+$search         = trim(get('q'));
+$filterType     = get('type');
+$filterStatus   = get('status');
 $filterPriority = get('priority');
-$dateFrom    = get('date_from');
-$dateTo      = get('date_to');
-$page        = max(1, (int)get('page', '1'));
-$perPage     = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
-$offset      = ($page - 1) * $perPage;
+$dateFrom       = get('date_from');
+$dateTo         = get('date_to');
+$page           = max(1, (int)get('page', '1'));
+$perPage        = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
+$offset         = ($page - 1) * $perPage;
 
-// ── Build WHERE ───────────────────────────────────────────
+// ── Build WHERE with visibility scoping ──────────────────
 $where  = ['1=1'];
 $params = [];
 
-// Staff only see their own
-if (!$isApprover) {
+if ($userLevel === 0 && !$isAdmin) {
+    // Requester — own only
     $where[]  = 'r.requester_id = ?';
-    $params[] = (int)$user['user_id'];
+    $params[] = $uid;
+} elseif ($userLevel === 1) {
+    // Dept Head — own department
+    $where[]  = 'r.department_id = ?';
+    $params[] = $deptId;
+} elseif ($userLevel === 2 && $uid !== APPROVER_PROCUREMENT_HEAD) {
+    // HR Director — Personnel only
+    $where[] = "r.requisition_type = 'personnel'";
+} elseif ($userLevel === 2 && $uid === APPROVER_PROCUREMENT_HEAD) {
+    // Procurement Head — Procurement + IT Asset + Merchandise
+    $where[] = "r.requisition_type IN ('procurement','it_asset','merchandise')";
 }
+// Finance Director (level 3), MD (level 4), Admin → no extra scope (see all)
 
 if ($search) {
     $where[]  = '(r.requisition_number LIKE ? OR u.full_name LIKE ? OR r.description LIKE ? OR d.department_name LIKE ?)';
@@ -106,7 +119,7 @@ function listUrl(array $extra = []): string {
 
 $hasFilters = $search || $filterType || $filterStatus || $filterPriority || $dateFrom || $dateTo;
 
-$pageTitle = 'All Requisitions';
+$pageTitle = $isApprover ? 'All Requisitions' : 'My Requisitions';
 include __DIR__ . '/../includes/header.php';
 ?>
 
