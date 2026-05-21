@@ -1,37 +1,36 @@
 <?php
-// session helpers
+// includes/auth.php — session, authentication, role helpers
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
- 
+
 // ── Checks ────────────────────────────────────────────────────────────────
- 
+
 function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
 }
- 
+
 function requireLogin(): void {
     if (!isLoggedIn()) {
         header('Location: /reqon/login.php');
         exit;
     }
 }
- 
+
 function currentUser(): array {
     return $_SESSION['user'] ?? [];
 }
- 
+
 /**
  * Check role by role_name stored in session.
- * New role_names: 'System Admin', 'HR Admin', 'Approver', 'Requester'
- * Shorthand aliases also accepted: 'admin', 'approver', 'requester'
+ * Accepts shorthand aliases: 'admin', 'approver', 'requester', 'hr admin'
  */
 function hasRole(string ...$roles): bool {
     $roleName = strtolower($_SESSION['user']['role_name'] ?? '');
     foreach ($roles as $r) {
         $r = strtolower($r);
         if ($r === $roleName) return true;
-        // Accept shorthand aliases
         if ($r === 'admin'     && $roleName === 'system admin') return true;
         if ($r === 'approver'  && $roleName === 'approver')     return true;
         if ($r === 'requester' && $roleName === 'requester')    return true;
@@ -39,19 +38,16 @@ function hasRole(string ...$roles): bool {
     }
     return false;
 }
- 
+
 // ── Login ─────────────────────────────────────────────────────────────────
- 
+
 /**
- * Attempts login with email + password.
- * Returns ['ok' => true, 'user' => [...]] or ['ok' => false, 'error' => '...']
+ * Attempts login. Returns ['ok'=>true,'user'=>[...]] or ['ok'=>false,'error'=>'...']
  */
 function attemptLogin(string $email, string $password): array {
     $db   = getDB();
     $stmt = $db->prepare("
-        SELECT u.*,
-               r.role_name,
-               d.department_name
+        SELECT u.*, r.role_name, d.department_name
           FROM users u
           LEFT JOIN roles       r ON r.role_id       = u.role_id
           LEFT JOIN departments d ON d.department_id = u.department_id
@@ -60,71 +56,82 @@ function attemptLogin(string $email, string $password): array {
     ");
     $stmt->execute([trim($email)]);
     $user = $stmt->fetch();
- 
+
     if (!$user) {
         return ['ok' => false, 'error' => 'Invalid email or password.'];
     }
- 
     if (!password_verify($password, $user['password_hash'])) {
         return ['ok' => false, 'error' => 'Invalid email or password.'];
     }
- 
-    // Pre-compute approval level once at login so every page can use it cheaply
-    $approvalLevel = _computeApprovalLevel(
-        (int)$user['role_id'],
-        $user['section'] ?? '',
-        (int)$user['department_id']
-    );
- 
+
+    $roleId        = (int)$user['role_id'];
+    $section       = $user['section'] ?? '';
+    $deptId        = (int)($user['department_id'] ?? 0);
+    $approvalLevel = _computeApprovalLevel($roleId, $section, $deptId);
+
+    // Build role label — refine for Approver (role_id=3) using approval_level
+    $roleLabel = _computeRoleLabel($roleId, $approvalLevel);
+
     $_SESSION['user_id'] = $user['user_id'];
     $_SESSION['user']    = [
         'user_id'         => $user['user_id'],
-        'id'              => $user['user_id'],   
+        'id'              => $user['user_id'],
         'full_name'       => $user['full_name'],
-        'name'            => $user['full_name'],  
+        'name'            => $user['full_name'],
         'email'           => $user['email'],
-        'role_id'         => (int)$user['role_id'],
+        'role_id'         => $roleId,
         'role_name'       => $user['role_name'] ?? '',
+        'role_label'      => $roleLabel,
         'department_id'   => $user['department_id'],
         'department_name' => $user['department_name'] ?? '',
-        'section'         => $user['section'] ?? '',
+        'section'         => $section,
         'approval_level'  => $approvalLevel,
     ];
- 
-    // Update last_login timestamp
+
     $db->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
        ->execute([$user['user_id']]);
- 
+
     return ['ok' => true, 'user' => $_SESSION['user']];
 }
- 
+
 /**
- * Compute the 1-4 approval level from role + section + department.
+ * Compute approval level (1–4) from role + section + department.
  * Returns 0 if the user has no approval authority.
  *
- * Role mapping (from roles table seed data):
- *   role_id=1  System Admin  → 0  (manages users, not approvals)
- *   role_id=2  HR Admin      → 2  (Level 2 — HR Director)
- *   role_id=3  Approver      → 1 / 3 / 4  (distinguished by section + dept)
- *   role_id=4  Requester     → 0
+ *   role_id=1  System Admin → 0
+ *   role_id=2  HR Admin     → 2  (HR Director)
+ *   role_id=3  Approver     → 1 (Dept Head) / 3 (Finance Dir) / 4 (MD)
+ *   role_id=4  Requester    → 0
  */
 function _computeApprovalLevel(int $roleId, string $section, int $deptId): int {
-    if ($roleId === 2) return 2; // HR Admin is always Level 2
- 
+    if ($roleId === 2) return 2;
     if ($roleId === 3) {
-        // Section field contains 'Dept Head' for Level 1 approvers
         if ($section && stripos($section, 'Dept Head') !== false) return 1;
-        // Finance dept (dept_id=3) without Dept Head section = Finance Director (Level 3)
         if ($deptId === 3) return 3;
-        // Everything else with role Approver and no section = MD (Level 4)
         return 4;
     }
- 
-    return 0; // role_id 1 (Admin) or 4 (Requester) — no approval level
+    return 0;
 }
- 
+
+/**
+ * Short role label for the header, e.g. "Requester", "Dept Head", "HR Director".
+ * Uses approval_level (already computed) to distinguish Finance Dir from MD.
+ */
+function _computeRoleLabel(int $roleId, int $approvalLevel): string {
+    if ($roleId === 1) return 'Admin';
+    if ($roleId === 2) return 'HR Director';
+    if ($roleId === 4) return 'Requester';
+    if ($roleId === 3) {
+        if ($approvalLevel === 1) return 'Dept Head';
+        if ($approvalLevel === 3) return 'Finance Director';
+        if ($approvalLevel === 4) return 'Managing Director';
+        return 'Approver';
+    }
+    return 'User';
+}
+
 // ── Logout ────────────────────────────────────────────────────────────────
- 
+
 function logout(): void {
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
@@ -137,15 +144,20 @@ function logout(): void {
     header('Location: /reqon/login.php');
     exit;
 }
- 
-// ── Role → Dashboard redirect ─────────────────────────────────────────────
- 
+
+// ── Post-login redirect ───────────────────────────────────────────────────
+
 /**
- * After login, redirect approvers to the queue, everyone else to dashboard.
+ * Admin → admin/dashboard.php
+ * Approvers → approvals/queue.php
+ * Everyone else → dashboard.php
  */
 function redirectAfterLogin(): void {
-    $level = $_SESSION['user']['approval_level'] ?? 0;
-    if ($level > 0) {
+    $roleId = $_SESSION['user']['role_id']      ?? 0;
+    $level  = $_SESSION['user']['approval_level'] ?? 0;
+    if ($roleId === 1) {
+        header('Location: /reqon/admin/dashboard.php');
+    } elseif ($level > 0) {
         header('Location: /reqon/approvals/queue.php');
     } else {
         header('Location: /reqon/dashboard.php');
