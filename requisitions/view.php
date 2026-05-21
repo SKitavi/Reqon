@@ -87,22 +87,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canDecide) {
     }
 }
 
-// Build 4-step track data
+// Build track data — load the chain to know which levels are skipped
+$chain = buildApprovalChain(
+    $req['requisition_type'],
+    (int)$req['requester_id'],
+    (int)$req['department_id']
+);
+
 $trackSteps = [];
-for ($lvl = 1; $lvl <= 4; $lvl++) {
-    $ah      = $approvalByLevel[$lvl] ?? null;
-    $current = (int)$req['current_approval_level'];
-    if ($ah && $ah['decision'] === 'approved')       $status = 'done';
-    elseif ($ah && $ah['decision'] === 'rejected')   $status = 'rejected';
-    elseif ($lvl === $current && $req['current_status'] === 'pending') $status = 'current';
-    else $status = 'waiting';
+foreach ($chain as $step_c) {
+    $lvl = $step_c['level'];
+    $ah  = $approvalByLevel[$lvl] ?? null;
+
+    if ($step_c['skipped']) {
+        $status = 'skipped';
+    } elseif ($ah && $ah['decision'] === 'approved') {
+        $status = 'done';
+    } elseif ($ah && $ah['decision'] === 'rejected') {
+        $status = 'rejected';
+    } elseif ($lvl === (int)$req['current_approval_level'] && $req['current_status'] === 'pending') {
+        $status = 'current';
+    } else {
+        $status = 'waiting';
+    }
 
     $trackSteps[$lvl] = [
-        'label'    => approvalLevelLabel($lvl),
-        'current_status'   => $status,
-        'approver' => $ah['approver_name'] ?? null,
-        'date'     => $ah['decision_date'] ?? null,
-        'comment'  => $ah['comments']      ?? null,
+        'label'          => $step_c['label'],
+        'current_status' => $status,
+        'approver'       => $ah['approver_name'] ?? null,
+        'date'           => $ah['decision_date'] ?? null,
+        'comment'        => $ah['comments']      ?? null,
+        'skip_reason'    => $step_c['skip_reason'] ?? '',
     ];
 }
 
@@ -231,33 +246,49 @@ include __DIR__ . '/../includes/header.php';
       <div class="sidebar-card-body">
         <div class="approval-track">
           <?php foreach ($trackSteps as $lvl => $step):
-            $dotIcon = match($step['current_status']) { 'done'=>'✓','rejected'=>'✕','current'=>'→',default=>'' };
-            $dotCls  = match($step['current_status']) { 'done','rejected'=>'done','current'=>'current',default=>'waiting' };
-            $roleCls = $dotCls;
+            $isSkipped  = $step['current_status'] === 'skipped';
             $isRejected = $step['current_status'] === 'rejected';
+            $dotIcon = match($step['current_status']) {
+                'done'    => '✓',
+                'rejected'=> '✕',
+                'current' => '→',
+                'skipped' => '—',
+                default   => '',
+            };
+            $dotCls = match($step['current_status']) {
+                'done','rejected' => 'done',
+                'current'         => 'current',
+                'skipped'         => 'skipped',
+                default           => 'waiting',
+            };
           ?>
           <div class="approval-step <?= $step['current_status'] === 'done' ? 'done' : '' ?>">
             <div class="ap-step-dot <?= $dotCls ?>"
-                 <?= $isRejected ? 'style="background:var(--brand);border-color:var(--brand)"' : '' ?>>
+                 <?= $isRejected ? 'style="background:var(--brand);border-color:var(--brand)"' : '' ?>
+                 <?= $isSkipped  ? 'style="background:var(--bg);border-color:var(--border);color:var(--text-muted)"' : '' ?>>
               <?= $dotIcon ?>
             </div>
             <div class="ap-step-info">
-              <div class="ap-step-role <?= $roleCls ?>">
+              <div class="ap-step-role <?= $dotCls ?>" <?= $isSkipped ? 'style="color:var(--text-muted)"' : '' ?>>
                 <?= e($step['label']) ?>
-                <?php if ($step['approver'] && in_array($step['current_status'],['done','rejected'])): ?>
+                <?php if ($step['approver'] && in_array($step['current_status'], ['done','rejected'])): ?>
                   <span style="font-weight:400;color:var(--text-muted)"> — <?= e($step['approver']) ?></span>
                 <?php endif; ?>
-                <?php if ($step['current_status']==='current'): ?>
+                <?php if ($step['current_status'] === 'current'): ?>
                   <span style="font-weight:400;font-size:11px;color:var(--orange-text)"> (Pending)</span>
                 <?php endif; ?>
               </div>
-              <?php if ($step['date']): ?>
-                <div class="ap-step-meta"><?= e(formatDate($step['date'],'d/m/Y H:i')) ?></div>
-              <?php elseif ($step['current_status']==='waiting'): ?>
+              <?php if ($isSkipped): ?>
+                <div class="ap-step-meta" style="color:var(--text-muted);font-style:italic">
+                  Skipped — <?= e($step['skip_reason']) ?>
+                </div>
+              <?php elseif ($step['date']): ?>
+                <div class="ap-step-meta"><?= e(formatDate($step['date'], 'd/m/Y H:i')) ?></div>
+              <?php elseif ($step['current_status'] === 'waiting'): ?>
                 <div class="ap-step-meta">Awaiting previous approval</div>
               <?php endif; ?>
               <?php if ($step['comment']): ?>
-                <div class="ap-step-comment"><?= e(mb_strimwidth($step['comment'],0,120,'…')) ?></div>
+                <div class="ap-step-comment"><?= e(mb_strimwidth($step['comment'], 0, 120, '…')) ?></div>
               <?php endif; ?>
             </div>
           </div>

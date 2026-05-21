@@ -1358,3 +1358,59 @@ table.req-table tbody td {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--slate-light); }
+
+
+/* ── Role label in nav ───────────────────────────────────────────────────── */
+.user-role-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+/* ── Approval tracker: skipped step ─────────────────────────────────────── */
+.ap-step-dot.skipped {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ── Admin stat cards ────────────────────────────────────────────────────── */
+.stat-card .stat-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.stat-card-warn  { border-left: 3px solid var(--orange-text, #e67e22) }
+.stat-card-danger{ border-left: 3px solid var(--brand, #c0392b) }
+
+/* ── Catalog dropdown ────────────────────────────────────────────────────── */
+.catalog-search-wrap { position: relative }
+.catalog-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  max-height: 260px; overflow-y: auto;
+}
+.catalog-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; cursor: pointer; font-size: 13px; gap: 12px;
+}
+.catalog-option:hover { background: var(--bg) }
+.co-name { flex: 1 }
+.co-cost { color: var(--green); font-weight: 600; white-space: nowrap }
+
+/* ── Audit action badges ─────────────────────────────────────────────────── */
+.audit-action {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.audit-action.CREATE  { background: #e8f5e9; color: #2e7d32 }
+.audit-action.APPROVE { background: #e3f2fd; color: #1565c0 }
+.audit-action.REJECT  { background: #ffebee; color: #c62828 }
+.audit-action.CANCEL  { background: #fff3e0; color: #e65100 }
+.audit-action.UPDATE  { background: #f3e5f5; color: #6a1b9a }
+.audit-action.LOGIN   { background: #f5f5f5; color: #424242 }
+.audit-action.DELETE  { background: #ffebee; color: #b71c1c }
