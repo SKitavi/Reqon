@@ -74,8 +74,66 @@ $recentStmt = getDB()->prepare(
 $recentStmt->execute($scopeParams);
 $recentReqs = $recentStmt->fetchAll();
 
-$showSubmitter = ($userLevel > 0); // approvers see who submitted
+// ── Role-specific extra metrics ───────────────────────────────────────────
+$isMary        = ($uid === APPROVER_PROCUREMENT_HEAD);
+$isFinanceDir  = ($uid === APPROVER_FINANCE_DIR);
+$isMD          = ($uid === APPROVER_MD);
 
+// Approved this month — Finance Dir and MD see org-wide, Mary sees goods only
+if ($isFinanceDir || $isMD) {
+    $approvedMonth = fetchOne(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount),0) AS total_kes
+           FROM requisitions
+          WHERE current_status = 'approved'
+            AND MONTH(final_decision_date) = MONTH(NOW())
+            AND YEAR(final_decision_date)  = YEAR(NOW())"
+    );
+} elseif ($isMary) {
+    $approvedMonth = fetchOne(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount),0) AS total_kes
+           FROM requisitions
+          WHERE current_status = 'approved'
+            AND requisition_type IN ('procurement','it_asset','merchandise')
+            AND MONTH(final_decision_date) = MONTH(NOW())
+            AND YEAR(final_decision_date)  = YEAR(NOW())"
+    );
+}
+
+// Top spending dept this month — Finance Dir and MD
+if ($isFinanceDir || $isMD) {
+    $topDept = fetchOne(
+        "SELECT d.department_name, COALESCE(SUM(r.total_amount),0) AS total_kes
+           FROM requisitions r
+           JOIN departments d ON d.department_id = r.department_id
+          WHERE r.current_status = 'approved'
+            AND MONTH(r.final_decision_date) = MONTH(NOW())
+            AND YEAR(r.final_decision_date)  = YEAR(NOW())
+          GROUP BY r.department_id
+          ORDER BY total_kes DESC
+          LIMIT 1"
+    );
+}
+
+// Total requisitions org-wide — MD and Mary
+if ($isMD) {
+    $totalOrgWide = (int)(fetchOne("SELECT COUNT(*) AS c FROM requisitions")['c'] ?? 0);
+}
+if ($isMary) {
+    $totalGoodsReqs = (int)(fetchOne(
+        "SELECT COUNT(*) AS c FROM requisitions
+          WHERE requisition_type IN ('procurement','it_asset','merchandise')"
+    )['c'] ?? 0);
+    $pendingLpo = (int)(fetchOne(
+        "SELECT COUNT(*) AS c FROM requisitions r
+          LEFT JOIN lpo_log l ON l.requisition_id = r.requisition_id
+         WHERE r.current_status = 'approved'
+           AND r.requisition_type IN ('procurement','it_asset','merchandise')
+           AND l.lpo_id IS NULL"
+    )['c'] ?? 0);
+    $generatedLpo = (int)(fetchOne("SELECT COUNT(*) AS c FROM lpo_log")['c'] ?? 0);
+}
+
+$showSubmitter = ($userLevel > 0);
 $pageTitle = 'Dashboard';
 include __DIR__ . '/includes/header.php';
 ?>
@@ -94,22 +152,37 @@ include __DIR__ . '/includes/header.php';
 
   <?php renderFlash(); ?>
 
-  <?php
-  // Extra stat cards for Mary — LPO tracking
-  if ($uid === APPROVER_PROCUREMENT_HEAD):
-    $pendingLpo = (int)(fetchOne(
-        "SELECT COUNT(*) AS c FROM requisitions r
-          LEFT JOIN lpo_log l ON l.requisition_id = r.requisition_id
-         WHERE r.current_status = 'approved'
-           AND r.requisition_type IN ('procurement','it_asset','merchandise')
-           AND l.lpo_id IS NULL"
-    )['c'] ?? 0);
-    $generatedLpo = (int)(fetchOne("SELECT COUNT(*) AS c FROM lpo_log")['c'] ?? 0);
-  ?>
-  <section class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px" aria-label="LPO summary">
+  <!-- ── Role-specific insight cards ─────────────────────────────────────── -->
+
+  <?php if ($isMary): ?>
+  <!-- Mary: Total Goods Reqs · Approved This Month · Pending LPOs · LPOs Generated -->
+  <section class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:16px" aria-label="Procurement insights">
+
+    <div class="stat-card">
+      <div class="stat-icon total" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/>
+        </svg>
+      </div>
+      <span class="stat-label">Total Requisitions</span>
+      <span class="stat-value"><?= number_format($totalGoodsReqs) ?></span>
+      <span class="stat-sub">Procurement · IT Asset · Merchandise</span>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon approved" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <span class="stat-label">Approved This Month</span>
+      <span class="stat-value"><?= number_format((int)($approvedMonth['cnt'] ?? 0)) ?></span>
+      <span class="stat-sub"><?= formatKES((float)($approvedMonth['total_kes'] ?? 0)) ?></span>
+    </div>
+
     <div class="stat-card <?= $pendingLpo > 0 ? 'stat-card-warn' : '' ?>">
       <div class="stat-icon pending" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </div>
@@ -117,19 +190,20 @@ include __DIR__ . '/includes/header.php';
       <span class="stat-value"><?= number_format($pendingLpo) ?></span>
       <span class="stat-sub">approved, not yet issued</span>
     </div>
+
     <div class="stat-card">
       <div class="stat-icon approved" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
         </svg>
       </div>
       <span class="stat-label">LPOs Generated</span>
       <span class="stat-value"><?= number_format($generatedLpo) ?></span>
       <span class="stat-sub">all time</span>
     </div>
+
   </section>
 
   <div style="margin-bottom:24px">
@@ -138,9 +212,76 @@ include __DIR__ . '/includes/header.php';
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
       </svg>
-      Open LPO Queue <?= $pendingLpo > 0 ? "({$pendingLpo} pending)" : '' ?>
+      Open LPO Queue<?= $pendingLpo > 0 ? " ({$pendingLpo} pending)" : '' ?>
     </a>
   </div>
+
+  <?php elseif ($isFinanceDir): ?>
+  <!-- Finance Director: Approved This Month · Top Spending Dept -->
+  <section class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));margin-bottom:28px" aria-label="Finance insights">
+
+    <div class="stat-card">
+      <div class="stat-icon approved" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <span class="stat-label">Approved This Month</span>
+      <span class="stat-value"><?= number_format((int)($approvedMonth['cnt'] ?? 0)) ?></span>
+      <span class="stat-sub"><?= formatKES((float)($approvedMonth['total_kes'] ?? 0)) ?></span>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon total" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+        </svg>
+      </div>
+      <span class="stat-label">Top Spending Dept</span>
+      <span class="stat-value" style="font-size:16px"><?= e($topDept['department_name'] ?? '—') ?></span>
+      <span class="stat-sub"><?= isset($topDept['total_kes']) ? formatKES((float)$topDept['total_kes']) . ' this month' : 'no data this month' ?></span>
+    </div>
+
+  </section>
+
+  <?php elseif ($isMD): ?>
+  <!-- MD: Total Requisitions · Approved This Month · Top Spending Dept -->
+  <section class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:28px" aria-label="Executive insights">
+
+    <div class="stat-card">
+      <div class="stat-icon total" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/>
+        </svg>
+      </div>
+      <span class="stat-label">Total Requisitions</span>
+      <span class="stat-value"><?= number_format($totalOrgWide) ?></span>
+      <span class="stat-sub">all time, org-wide</span>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon approved" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <span class="stat-label">Approved This Month</span>
+      <span class="stat-value"><?= number_format((int)($approvedMonth['cnt'] ?? 0)) ?></span>
+      <span class="stat-sub"><?= formatKES((float)($approvedMonth['total_kes'] ?? 0)) ?></span>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon total" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+        </svg>
+      </div>
+      <span class="stat-label">Top Spending Dept</span>
+      <span class="stat-value" style="font-size:16px"><?= e($topDept['department_name'] ?? '—') ?></span>
+      <span class="stat-sub"><?= isset($topDept['total_kes']) ? formatKES((float)$topDept['total_kes']) . ' this month' : 'no data this month' ?></span>
+    </div>
+
+  </section>
   <?php endif; ?>
 
   <section class="stat-grid" aria-label="Requisition summary">
