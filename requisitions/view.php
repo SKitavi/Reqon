@@ -63,7 +63,7 @@ foreach ($approvalHistory as $ah) {
 $canDecide = (
     $req['current_status'] === 'pending'
     && $userLevel > 0
-    && (int)$req['current_approval_level'] === $userLevel
+    && (int)$req['current_approval_level'] === getEffectiveApprovalLevel($user, $req)
 );
 
 // Handle inline approve/reject POST
@@ -183,16 +183,21 @@ include __DIR__ . '/../includes/header.php';
         <span style="font-size:13px;color:var(--text-muted)">Required: <strong><?= e(formatDate($req['date_required'])) ?></strong></span>
         <?php if ($req['current_status'] === 'approved' && in_array($req['requisition_type'], ['procurement','it_asset','merchandise'])): ?>
         <span style="margin-left:auto">
-          <a href="<?= BASE_URL ?>/api/generate_lpo.php?id=<?= $reqId ?>" target="_blank"
-             class="btn btn-outline btn-sm" style="gap:5px">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            Generate LPO
-          </a>
+          <?php if ((int)$user['user_id'] === APPROVER_PROCUREMENT_HEAD): ?>
+            <a href="<?= BASE_URL ?>/procurement/lpo_queue.php"
+               class="btn btn-outline btn-sm" style="gap:5px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              Go to LPO Queue
+            </a>
+          <?php elseif ($isAdmin): ?>
+            <a href="<?= BASE_URL ?>/procurement/lpo_queue.php"
+               class="btn btn-outline btn-sm" style="gap:5px">View LPO Queue</a>
+          <?php endif; ?>
         </span>
         <?php endif; ?>
       </div>

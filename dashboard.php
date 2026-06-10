@@ -94,6 +94,55 @@ include __DIR__ . '/includes/header.php';
 
   <?php renderFlash(); ?>
 
+  <?php
+  // Extra stat cards for Mary — LPO tracking
+  if ($uid === APPROVER_PROCUREMENT_HEAD):
+    $pendingLpo = (int)(fetchOne(
+        "SELECT COUNT(*) AS c FROM requisitions r
+          LEFT JOIN lpo_log l ON l.requisition_id = r.requisition_id
+         WHERE r.current_status = 'approved'
+           AND r.requisition_type IN ('procurement','it_asset','merchandise')
+           AND l.lpo_id IS NULL"
+    )['c'] ?? 0);
+    $generatedLpo = (int)(fetchOne("SELECT COUNT(*) AS c FROM lpo_log")['c'] ?? 0);
+  ?>
+  <section class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px" aria-label="LPO summary">
+    <div class="stat-card <?= $pendingLpo > 0 ? 'stat-card-warn' : '' ?>">
+      <div class="stat-icon pending" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <span class="stat-label">Pending LPOs</span>
+      <span class="stat-value"><?= number_format($pendingLpo) ?></span>
+      <span class="stat-sub">approved, not yet issued</span>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon approved" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      <span class="stat-label">LPOs Generated</span>
+      <span class="stat-value"><?= number_format($generatedLpo) ?></span>
+      <span class="stat-sub">all time</span>
+    </div>
+  </section>
+
+  <div style="margin-bottom:24px">
+    <a href="<?= BASE_URL ?>/procurement/lpo_queue.php" class="btn btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Open LPO Queue <?= $pendingLpo > 0 ? "({$pendingLpo} pending)" : '' ?>
+    </a>
+  </div>
+  <?php endif; ?>
+
   <section class="stat-grid" aria-label="Requisition summary">
     <div class="stat-card">
       <div class="stat-icon total" aria-hidden="true">

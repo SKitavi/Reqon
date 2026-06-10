@@ -28,16 +28,26 @@ $perPage   = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
 $highlight = (int)get('highlight'); // scroll to this card after a redirect
 
 // ── Build query ───────────────────────────────────────────────────────────
-$where  = ["r.current_status = 'pending'", "r.current_approval_level = ?"];
-$params = [$userLevel];
+// Mary (Procurement Head, user 7) is level 1 in session but acts at level 2
+// for Procurement/IT Asset/Merchandise. Handle both cases.
 
-// Procurement Head (user 7) at level 2 only sees non-personnel types
-if ($uid === APPROVER_PROCUREMENT_HEAD && $userLevel === 2) {
-    $where[] = "r.requisition_type IN ('procurement','it_asset','merchandise')";
-}
-// HR Director (user 8) at level 2 only sees personnel
-if ($uid === APPROVER_HR_DIRECTOR && $userLevel === 2) {
-    $where[] = "r.requisition_type = 'personnel'";
+if ($uid === APPROVER_PROCUREMENT_HEAD) {
+    // Mary sees: her dept-head queue (level 1, Procurement dept reqs) PLUS
+    // her Procurement Head queue (level 2, Procurement/IT Asset/Merchandise)
+    $where  = [
+        "r.current_status = 'pending'",
+        "((r.current_approval_level = 1 AND r.department_id = 4)
+          OR (r.current_approval_level = 2 AND r.requisition_type IN ('procurement','it_asset','merchandise')))",
+    ];
+    $params = [];
+} else {
+    $where  = ["r.current_status = 'pending'", "r.current_approval_level = ?"];
+    $params = [$userLevel];
+
+    // HR Director (user 8) at level 2 only sees personnel
+    if ($uid === APPROVER_HR_DIRECTOR && $userLevel === 2) {
+        $where[] = "r.requisition_type = 'personnel'";
+    }
 }
 
 if ($search) {
@@ -147,7 +157,7 @@ include __DIR__ . '/../includes/header.php';
 
   <?php renderFlash(); ?>
 
-  <!-- Filter bar (matches Balsamiq: search + Type + Status/Priority + Date Range) -->
+  <!-- Filter bar (search + Type + Status/Priority + Date Range) -->
   <form method="GET" action="" class="filter-bar" role="search">
 
     <div class="filter-search">
@@ -279,7 +289,6 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Action buttons -->
         <div class="queue-card-actions">
-
           <a href="<?= BASE_URL ?>/requisitions/view.php?id=<?= $reqId ?>"
              class="btn btn-outline btn-sm">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -289,34 +298,6 @@ include __DIR__ . '/../includes/header.php';
             </svg>
             View Details
           </a>
-
-          <!-- Approve -->
-          <form method="POST" action="<?= BASE_URL ?>/approvals/action.php"
-                onsubmit="return confirmApprove(event, '<?= e($req['requisition_number']) ?>')">
-            <input type="hidden" name="requisition_id" value="<?= $reqId ?>">
-            <input type="hidden" name="action" value="approve">
-            <input type="hidden" name="comments" value="">
-            <button type="submit" class="btn btn-dark btn-sm">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Approve
-            </button>
-          </form>
-
-          <!-- Reject (opens inline modal) -->
-          <button type="button" class="btn btn-outline btn-sm"
-                  style="color:var(--brand);border-color:var(--brand)"
-                  onclick="openRejectModal(<?= $reqId ?>, '<?= e($req['requisition_number']) ?>')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-            </svg>
-            Reject
-          </button>
-
         </div><!-- /queue-card-actions -->
 
       </article>
@@ -348,61 +329,7 @@ include __DIR__ . '/../includes/header.php';
 
 </div><!-- /page-wrap -->
 
-
-<!-- ── Reject modal ─────────────────────────────────────────────────── -->
-<div class="reject-overlay" id="reject-overlay" role="dialog"
-     aria-modal="true" aria-labelledby="reject-modal-title">
-  <div class="reject-modal">
-    <h3 id="reject-modal-title">Reject <span id="modal-req-num"></span></h3>
-    <form method="POST" action="<?= BASE_URL ?>/approvals/action.php" id="reject-form">
-      <input type="hidden" name="requisition_id" id="modal-req-id">
-      <input type="hidden" name="action" value="reject">
-      <label for="reject-comments" style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px">
-        Reason for rejection <span style="color:var(--brand)">*</span>
-      </label>
-      <textarea name="comments" id="reject-comments" rows="4"
-                placeholder="Provide a clear reason so the requester knows what to change…"
-                required></textarea>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-outline btn-sm"
-                onclick="closeRejectModal()">Cancel</button>
-        <button type="submit" class="btn btn-danger btn-sm">Confirm Rejection</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
 <script>
-// ── Approve confirmation ──────────────────────────────────────────────────
-function confirmApprove(e, reqNum) {
-  return confirm('Approve ' + reqNum + '?\n\nThis will forward it to the next approval level.');
-}
-
-// ── Reject modal ──────────────────────────────────────────────────────────
-function openRejectModal(reqId, reqNum) {
-  document.getElementById('modal-req-id').value  = reqId;
-  document.getElementById('modal-req-num').textContent = reqNum;
-  document.getElementById('reject-comments').value = '';
-  document.getElementById('reject-overlay').classList.add('open');
-  document.getElementById('reject-comments').focus();
-}
-
-function closeRejectModal() {
-  document.getElementById('reject-overlay').classList.remove('open');
-}
-
-// Close overlay when clicking outside the modal box
-document.getElementById('reject-overlay').addEventListener('click', function(e) {
-  if (e.target === this) closeRejectModal();
-});
-
-// Close on Escape key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeRejectModal();
-});
-
-// ── Scroll to highlighted card after redirect ─────────────────────────────
 <?php if ($highlight): ?>
 const highlighted = document.getElementById('req-<?= $highlight ?>');
 if (highlighted) {

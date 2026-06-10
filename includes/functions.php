@@ -197,8 +197,19 @@ function buildApprovalChain(string $reqType, int $submitterId, int $deptId): arr
             break;
 
         case 'procurement':
+            // Procurement skips the submitter's dept head entirely.
+            // Chain is: Procurement Head → Finance Director → MD (3 active levels).
+            // level_id 9 (Submitter Dept Head for procurement) is intentionally unused.
+            $slots = [
+                1 => null,                           // no dept head slot for procurement
+                2 => APPROVER_PROCUREMENT_HEAD,      // Mary — always L2 slot
+                3 => APPROVER_FINANCE_DIR,
+                4 => APPROVER_MD,
+            ];
+            // Mark L1 as structurally absent (not a skip-self, just not part of the chain)
+            break;
+
         case 'merchandise':
-        default:
             $l1 = _getDeptHead($deptId);
             $slots = [
                 1 => $l1,
@@ -209,28 +220,20 @@ function buildApprovalChain(string $reqType, int $submitterId, int $deptId): arr
             break;
     }
 
-    // Apply skip-self rules
+    // Apply skip-self rules. null slots are structurally absent (e.g. procurement has no L1).
     $chain = [];
     foreach ($slots as $level => $approverId) {
         $skipped     = false;
         $skipReason  = '';
 
         if ($approverId === null) {
-            // No dept head found for this department
             $skipped    = true;
-            $skipReason = 'No dept head in this department';
+            $skipReason = 'Not part of this requisition type\'s chain';
         } elseif ($approverId === $submitterId) {
             // Submitter IS this approver
             $skipped    = true;
             $skipReason = 'Submitted by approver';
         }
-
-        // Special case: Mary submitting Procurement/IT Asset/Merchandise
-        // She is both L1 (Procurement dept head) and L2 (Procurement Head slot).
-        // The generic skip-self above already handles L1 (she's her own dept head).
-        // L2 is also skipped because she IS the Procurement Head.
-        // This is already covered by the generic rule above since $approverId === $submitterId
-        // for both slots when Mary submits.
 
         $chain[] = [
             'level'       => $level,
@@ -309,7 +312,7 @@ function _chainLevelLabel(string $reqType, int $level): string {
             4 => 'Managing Director',
         ],
         'procurement' => [
-            1 => 'Dept Head',
+            // L1 is structurally absent; chain starts at L2 (Procurement Head)
             2 => 'Procurement Head',
             3 => 'Finance Director',
             4 => 'Managing Director',
@@ -324,7 +327,38 @@ function _chainLevelLabel(string $reqType, int $level): string {
     return $map[$reqType][$level] ?? approvalLevelLabel($level);
 }
 
-// ── Approver lookup (used by processApprovalDecision) ────────────────────
+/**
+ * Public version of _chainLevelLabel for use in views.
+ * Returns the correct level 2 label based on requisition type:
+ *   personnel → "HR Director"
+ *   all others → "Procurement Head"
+ */
+function approvalLevelLabelForType(string $reqType, int $level): string {
+    return _chainLevelLabel($reqType, $level);
+}
+
+/**
+ * Get the effective approval level for a user on a specific requisition.
+ * Normally this equals getRoleLevel(), but Mary (Procurement Head, user 7)
+ * acts at level 2 for Procurement/IT Asset/Merchandise reqs even though
+ * her stored approval_level is 1 (Dept Head of Procurement dept).
+ *
+ * Returns the level this user should act at for this req, or 0 if none.
+ */
+function getEffectiveApprovalLevel(array $user, array $req): int {
+    $uid      = (int)$user['user_id'];
+    $baseLevel = getRoleLevel($user);
+
+    // Mary special case: she is the Procurement Head slot (level 2)
+    // for Procurement, IT Asset and Merchandise requisitions
+    if ($uid === APPROVER_PROCUREMENT_HEAD
+        && in_array($req['requisition_type'], ['procurement', 'it_asset', 'merchandise'])
+    ) {
+        return 2;
+    }
+
+    return $baseLevel;
+}
 
 /**
  * Find the next approver for a given level, using the type-specific chain.
@@ -452,7 +486,7 @@ function processApprovalDecision(string $action, int $reqId, int $approverId, st
                  VALUES (?, ?, 'approval', ?)",
                 [
                     $submitterId, $reqId,
-                    "Congratulations! Your requisition {$reqNumber} has been fully approved.",
+                    "Your requisition {$reqNumber} has been fully approved.",
                 ]
             );
             auditLog('APPROVE', 'requisitions', $reqId, "Final approval — fully approved");
@@ -528,9 +562,9 @@ function submitRequisition(array $form, array $user): int {
             $form['description'],
             $form['total_amount'] ?? 0,
             $startLevel,
-            $form['title']           ?? null,
-            $form['employment_type'] ?? null,
-            $form['budget_code']     ?? null,
+            $form['title']                                                    ?? null,
+            ($form['employment_type'] ?? '') !== '' ? $form['employment_type'] : null,
+            $form['budget_code']                                              ?? null,
         ]
     );
     $reqId = (int)lastInsertId();

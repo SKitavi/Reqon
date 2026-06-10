@@ -84,6 +84,9 @@ $roleLabel  = $user['role_label'] ?? ($isAdmin ? 'Admin' : ($isApprover ? 'Appro
         <?php if ($isApprover && !$isAdmin): ?>
           <a href="<?= BASE_URL ?>/approvals/queue.php" role="menuitem">Approval Queue</a>
         <?php endif; ?>
+        <?php if ((int)($user['user_id'] ?? 0) === APPROVER_PROCUREMENT_HEAD || $isAdmin): ?>
+          <a href="<?= BASE_URL ?>/procurement/lpo_queue.php" role="menuitem">LPO Queue</a>
+        <?php endif; ?>
         <div class="divider"></div>
         <a href="<?= BASE_URL ?>/logout.php" class="logout-link" role="menuitem">Log out</a>
       </div>

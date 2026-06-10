@@ -11,8 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect(BASE_URL . '/approvals/queue.php');
 }
 
-$user     = currentUser();
-$userLevel = getRoleLevel($user); 
+$user      = currentUser();
+$userLevel = getRoleLevel($user);
 
 // Check the user actually has an approval role
 if ($userLevel === 0) {
@@ -38,8 +38,11 @@ if (!$req) {
     redirect(BASE_URL . '/approvals/queue.php');
 }
 
-// Make sure this req is actually at the user's level
-if ((int)$req['current_approval_level'] !== $userLevel) {
+// Use effective level (handles Mary's dual role)
+$effectiveLevel = getEffectiveApprovalLevel($user, $req);
+
+// Make sure this req is actually at the user's effective level
+if ((int)$req['current_approval_level'] !== $effectiveLevel) {
     setFlash('error', 'This requisition is not currently at your approval level.');
     redirect(BASE_URL . '/approvals/queue.php');
 }
@@ -62,13 +65,16 @@ processApprovalDecision($action, $reqId, (int)$user['user_id'], $comments);
 // Set a friendly flash message
 $reqNumber = $req['requisition_number'];
 if ($action === 'approve') {
-    $nextLevel = (int)$req['current_approval_level'] + 1;
+    $nextLevel = $effectiveLevel + 1;
     $msg = $nextLevel > 4
         ? "{$reqNumber} has been fully approved."
-        : "{$reqNumber} approved and forwarded to " . approvalLevelLabel($nextLevel) . ".";
+        : "{$reqNumber} approved and forwarded to " . approvalLevelLabelForType($req['requisition_type'], $nextLevel) . ".";
 } else {
     $msg = "{$reqNumber} has been rejected.";
 }
 setFlash('success', $msg);
 
-redirect(BASE_URL . '/approvals/queue.php');
+$dest = ((int)($user['approval_level'] ?? 0) > 0)
+    ? BASE_URL . '/approvals/queue.php'
+    : BASE_URL . '/dashboard.php';
+redirect($dest);

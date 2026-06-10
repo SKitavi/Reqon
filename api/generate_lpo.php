@@ -33,11 +33,12 @@ $req = fetchOne(
 
 if (!$req) { die('Requisition not found.'); }
 
-// Access control: owner, any approver, or admin
-$isOwner    = (int)$req['requester_id'] === (int)$user['user_id'];
-$isApprover = getRoleLevel($user) > 0;
-$isAdmin    = ($user['role_id'] ?? 0) == 1;
-if (!$isOwner && !$isApprover && !$isAdmin) { die('Access denied.'); }
+// Access control: only Procurement Head (Mary) and Admin
+$isAdmin = ($user['role_id'] ?? 0) == 1;
+$isMary  = ((int)$user['user_id'] === APPROVER_PROCUREMENT_HEAD);
+if (!$isMary && !$isAdmin) {
+    die('Access denied. LPO generation is restricted to the Procurement Head.');
+}
 
 // LPO only makes sense for approved goods-type requisitions
 if ($req['current_status'] !== 'approved') {
