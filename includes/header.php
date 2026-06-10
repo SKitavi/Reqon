@@ -1,15 +1,21 @@
 <?php
-// include this at the top of every authenticated page AFTER calling requireLogin()
-// The $pageTitle variable should be set before including this file.
-
+// includes/header.php
 $pageTitle = $pageTitle ?? 'Reqon';
 $user      = currentUser();
 
-// Unread notification count (simple query)
-$db              = getDB();
-$notifStmt       = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
-$notifStmt->execute([$user['id']]);
-$unreadCount     = (int) $notifStmt->fetchColumn();
+// Unread notification count
+$notifStmt = getDB()->prepare(
+    "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_status = 'unread'"
+);
+$notifStmt->execute([$user['user_id']]);
+$unreadCount = (int)$notifStmt->fetchColumn();
+
+$userLevel  = getRoleLevel($user);
+$isApprover = $userLevel > 0;
+$isAdmin    = ($user['role_id'] ?? 0) == 1;
+
+// Role label shown next to name — e.g. "Requester", "Dept Head", "HR Director"
+$roleLabel  = $user['role_label'] ?? ($isAdmin ? 'Admin' : ($isApprover ? 'Approver' : 'Requester'));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,31 +32,19 @@ $unreadCount     = (int) $notifStmt->fetchColumn();
   <!-- Brand -->
   <div class="nav-brand">
     <span class="logo-box">ISUZU EA</span>
-    <a href="/reqon/dashboard.php" class="brand-name">Reqon</a>
+    <a href="<?= $isAdmin ? BASE_URL . '/admin/dashboard.php' : BASE_URL . '/dashboard.php' ?>"
+       class="brand-name">Reqon</a>
   </div>
 
-  <!-- Search -->
-  <div class="nav-search" role="search">
-    <span class="search-icon" aria-hidden="true">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-    </span>
-    <input
-      type="search"
-      placeholder="Search requisitions..."
-      aria-label="Search requisitions"
-      id="global-search"
-      onkeydown="if(event.key==='Enter') window.location='/reqon/requisitions/list.php?q='+encodeURIComponent(this.value)"
-    >
-  </div>
+  <!-- Spacer (search removed — lives on list pages only) -->
+  <div class="nav-spacer" style="flex:1"></div>
 
   <!-- Right side -->
   <div class="nav-right">
 
     <!-- Notification bell -->
-    <a href="#" class="nav-bell" aria-label="Notifications (<?= $unreadCount ?> unread)">
+    <a href="<?= BASE_URL ?>/notifications/index.php" class="nav-bell"
+       aria-label="Notifications (<?= $unreadCount ?> unread)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -71,16 +65,30 @@ $unreadCount     = (int) $notifStmt->fetchColumn();
           <circle cx="12" cy="7" r="4"/>
         </svg>
       </div>
-      <span class="user-name"><?= htmlspecialchars($user['name']) ?></span>
+      <!-- Name + role label -->
+      <span class="user-name">
+        <?= e($user['full_name'] ?? $user['name'] ?? '') ?>
+        <span class="user-role-label">&middot; <?= e($roleLabel) ?></span>
+      </span>
       <span class="chevron" aria-hidden="true">▾</span>
 
       <div class="nav-dropdown" id="user-dropdown" role="menu">
-        <a href="/reqon/dashboard.php" role="menuitem">Dashboard</a>
-        <?php if (hasRole('dept_head','hr_director','finance_director','managing_director')): ?>
-          <a href="/reqon/approvals/queue.php" role="menuitem">Approval Queue</a>
+        <?php if ($isAdmin): ?>
+          <a href="<?= BASE_URL ?>/admin/dashboard.php" role="menuitem">Admin Dashboard</a>
+        <?php else: ?>
+          <a href="<?= BASE_URL ?>/dashboard.php" role="menuitem">Dashboard</a>
+        <?php endif; ?>
+        <a href="<?= BASE_URL ?>/notifications/index.php" role="menuitem">
+          Notifications<?= $unreadCount > 0 ? ' (' . $unreadCount . ')' : '' ?>
+        </a>
+        <?php if ($isApprover && !$isAdmin): ?>
+          <a href="<?= BASE_URL ?>/approvals/queue.php" role="menuitem">Approval Queue</a>
+        <?php endif; ?>
+        <?php if ((int)($user['user_id'] ?? 0) === APPROVER_PROCUREMENT_HEAD || $isAdmin): ?>
+          <a href="<?= BASE_URL ?>/procurement/lpo_queue.php" role="menuitem">LPO Queue</a>
         <?php endif; ?>
         <div class="divider"></div>
-        <a href="/reqon/logout.php" class="logout-link" role="menuitem">Log out</a>
+        <a href="<?= BASE_URL ?>/logout.php" class="logout-link" role="menuitem">Log out</a>
       </div>
     </div>
 

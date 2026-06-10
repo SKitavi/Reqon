@@ -22,6 +22,7 @@ if (file_exists(__DIR__.'/../.env')) {
     define('DB_HOST','localhost');
     define('DB_NAME','reqon_db');
     define('DB_USER','root');
+    define('DB_PASS','');
     define('APP_NAME','Reqon');
     define('APP_ENV','development');
     define('APP_DEBUG', true );
@@ -32,12 +33,11 @@ if (file_exists(__DIR__.'/../.env')) {
 define('ROOT_PATH',dirname(__DIR__));
 define('CONFIG_PATH', ROOT_PATH . '/config');
 define('INCLUDES_PATH', ROOT_PATH . '/includes');
-define('MODULES_PATH', ROOT_PATH . '/modules');
 define('ASSETS_PATH', ROOT_PATH . '/assets');
 define('UPLOADS_PATH', ROOT_PATH . '/uploads');
 
 //Define URLs
-define('BASE_URL', APP_URL);
+define('BASE_URL', rtrim(APP_URL, '/'));
 define('ASSETS_URL', BASE_URL . '/assets');
 define('UPLOADS_URL', BASE_URL . '/uploads');
 
