@@ -67,10 +67,9 @@ function attemptLogin(string $email, string $password): array {
     $roleId        = (int)$user['role_id'];
     $section       = $user['section'] ?? '';
     $deptId        = (int)($user['department_id'] ?? 0);
+    $deptName      = $user['department_name'] ?? '';
     $approvalLevel = _computeApprovalLevel($roleId, $section, $deptId);
-
-    // Build role label — refine for Approver (role_id=3) using approval_level
-    $roleLabel = _computeRoleLabel($roleId, $approvalLevel);
+    $roleLabel     = _buildRoleLabelWithDept(_computeRoleLabel($roleId, $approvalLevel), $deptName);
 
     $_SESSION['user_id'] = $user['user_id'];
     $_SESSION['user']    = [
@@ -114,11 +113,12 @@ function _computeApprovalLevel(int $roleId, string $section, int $deptId): int {
 }
 
 /**
- * Short role label for the header, e.g. "Requester", "Dept Head", "HR Director".
- * Uses approval_level (already computed) to distinguish Finance Dir from MD.
+ * Role label for the header, prefixed with department name.
+ * e.g. "IT · Requester", "HR · HR Director", "System Admin"
+ * Admin (role_id=1) gets no prefix.
  */
 function _computeRoleLabel(int $roleId, int $approvalLevel): string {
-    if ($roleId === 1) return 'Admin';
+    if ($roleId === 1) return 'System Admin';
     if ($roleId === 2) return 'HR Director';
     if ($roleId === 4) return 'Requester';
     if ($roleId === 3) {
@@ -128,6 +128,17 @@ function _computeRoleLabel(int $roleId, int $approvalLevel): string {
         return 'Approver';
     }
     return 'User';
+}
+
+/**
+ * Prepend department name to a role label.
+ * Called after session is built so department_name is available.
+ * Admin gets no prefix. Empty dept falls back to role label only.
+ */
+function _buildRoleLabelWithDept(string $roleLabel, string $deptName): string {
+    if ($roleLabel === 'System Admin') return 'System Admin';
+    if ($deptName === '') return $roleLabel;
+    return $deptName . ' · ' . $roleLabel;
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────

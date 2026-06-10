@@ -88,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
         $quantities = $_POST['quantity']         ?? [];
         $prices     = $_POST['unit_cost']        ?? [];
         $catalogIds = $_POST['catalog_id']       ?? [];
-        $isCustoms  = $_POST['is_custom']        ?? [];
 
         foreach ($itemDescs as $i => $name) {
             $name = trim($name);
@@ -97,19 +96,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
             $price      = max(0, (float)($prices[$i] ?? 0));
             $subtotal   = $qty * $price;
             $totalAmount += $subtotal;
+            $catalogId  = ($catalogIds[$i] ?? '') !== '' ? (int)$catalogIds[$i] : null;
             $items[] = [
                 'item_description' => $name,
                 'quantity'         => $qty,
                 'unit_cost'        => $price,
                 'subtotal'         => $subtotal,
-                'catalog_id'       => ($catalogIds[$i] ?? '') !== '' ? (int)$catalogIds[$i] : null,
-                'is_custom'        => (int)($isCustoms[$i] ?? 0),
+                'catalog_id'       => $catalogId,
+                'is_custom'        => 0,
             ];
         }
-        if (empty($items)) $errors[] = 'Please add at least one item.';
+        if (empty($items)) {
+            $errors[] = 'Please add at least one item.';
+        } else {
+            // Server-side: every item must come from the catalog
+            foreach ($items as $item) {
+                if (!$item['catalog_id']) {
+                    $errors[] = 'All items must be selected from the catalog.';
+                    break;
+                }
+            }
+        }
     }
 
-    $employmentType = post('employment_type');
+    $employmentType = ($type === 'personnel') ? post('employment_type') : null;
 
     if (empty($errors)) {
         $_SESSION['req_form'] = array_merge($_SESSION['req_form'], [
@@ -135,11 +145,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     }
 
     try {
-        $reqId = submitRequisition($form, $user);
+        $reqId     = submitRequisition($form, $user);
         $reqNumber = fetchOne("SELECT requisition_number FROM requisitions WHERE requisition_id = ?", [$reqId])['requisition_number'] ?? '';
         unset($_SESSION['req_form']);
         setFlash('success', "Requisition {$reqNumber} submitted successfully.");
-        redirect(BASE_URL . '/requisitions/view.php?id=' . $reqId);
+        redirect(BASE_URL . '/dashboard.php');
     } catch (Exception $e) {
         $errors[] = 'Something went wrong. Please try again.';
         if (defined('APP_DEBUG') && APP_DEBUG) $errors[] = $e->getMessage();
@@ -336,16 +346,15 @@ include __DIR__ . '/../includes/header.php';
           </thead>
           <tbody id="items-body">
             <?php
-            $savedItems = $form['items'] ?? [['item_description'=>'','quantity'=>1,'unit_cost'=>0,'catalog_id'=>null,'is_custom'=>0]];
+            $savedItems = $form['items'] ?? [['item_description'=>'','quantity'=>1,'unit_cost'=>0,'catalog_id'=>null]];
             foreach ($savedItems as $item): ?>
             <tr>
               <td>
                 <input type="text" name="item_description[]"
                        value="<?= e($item['item_description']) ?>"
-                       placeholder="<?= $isPersonnel ? 'e.g. Senior Associate' : 'Item description' ?>"
-                       oninput="recalcRow(this)" required>
+                       placeholder="<?= $isPersonnel ? 'Select from catalog above' : 'Select from catalog above' ?>"
+                       oninput="recalcRow(this)" required readonly style="background:var(--bg)">
                 <input type="hidden" name="catalog_id[]" value="<?= $item['catalog_id'] ?? '' ?>">
-                <input type="hidden" name="is_custom[]"  value="<?= (int)($item['is_custom'] ?? 0) ?>">
               </td>
               <td><input type="number" name="quantity[]" min="1"
                          value="<?= (int)($item['quantity'] ?? 1) ?>"
@@ -360,13 +369,7 @@ include __DIR__ . '/../includes/header.php';
           </tbody>
         </table>
 
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
-          <button type="button" class="add-item-btn" onclick="addItemRow()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add <?= $isPersonnel ? 'another level' : 'item' ?>
-          </button>
+        <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:8px">
           <div class="total-row">
             <span class="total-label">Total:</span>
             <span class="total-value" id="grand-total">KES <?= number_format((float)($form['total_amount'] ?? 0), 2) ?></span>
@@ -375,10 +378,12 @@ include __DIR__ . '/../includes/header.php';
 
         <?php if ($isPersonnel): ?>
         <p class="field-hint" style="margin-top:8px">
-          Select the seniority band from the catalog. The unit cost is the monthly salary budget.
+          Search and select the seniority band from the catalog above. The unit cost is the monthly salary budget.
           Set quantity to the number of months (or 1 for a headcount budget line).
           Enter the actual role title in the Description field below.
         </p>
+        <?php else: ?>
+        <p class="field-hint" style="margin-top:8px">Search and select an item from the catalog above.</p>
         <?php endif; ?>
       </div>
 
@@ -442,7 +447,7 @@ include __DIR__ . '/../includes/header.php';
           <tbody>
             <?php foreach ($form['items'] as $item): ?>
             <tr>
-              <td><?= e($item['item_description']) ?><?= !empty($item['is_custom']) ? ' <span style="font-size:11px;color:var(--text-muted)">(custom)</span>' : '' ?></td>
+              <td><?= e($item['item_description']) ?></td>
               <td><?= (int)$item['quantity'] ?></td>
               <td><?= formatKES((float)$item['unit_cost']) ?></td>
               <td style="text-align:right"><?= formatKES((float)$item['subtotal']) ?></td>
@@ -471,16 +476,16 @@ include __DIR__ . '/../includes/header.php';
           </p>
         <?php else: ?>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-            <?php foreach ($chainPreview as $step_c): ?>
+            <?php
+            $activeSteps = array_filter($chainPreview, fn($s) => !$s['skipped']);
+            $activeCount = count($activeSteps);
+            $stepNum = 0;
+            foreach ($activeSteps as $step_c):
+              $stepNum++;
+            ?>
             <div style="display:flex;align-items:center;gap:10px;font-size:13px">
-              <?php if ($step_c['skipped']): ?>
-                <span style="width:20px;height:20px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:10px;flex-shrink:0">—</span>
-                <span style="color:var(--text-muted);text-decoration:line-through"><?= e($step_c['label']) ?></span>
-                <span style="font-size:11px;color:var(--text-muted);font-style:italic">Skipped — <?= e($step_c['skip_reason']) ?></span>
-              <?php else: ?>
-                <span style="width:20px;height:20px;border-radius:50%;background:var(--green);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0">✓</span>
-                <span style="color:var(--text)"><?= e($step_c['label']) ?></span>
-              <?php endif; ?>
+              <span style="width:20px;height:20px;border-radius:50%;background:var(--green);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0"><?= $stepNum ?></span>
+              <span style="color:var(--text)"><?= e($step_c['label']) ?></span>
             </div>
             <?php endforeach; ?>
           </div>
@@ -542,25 +547,24 @@ if (searchInput) {
     if (!q) { dropdown.style.display = 'none'; return; }
 
     const matches = CATALOG.filter(c => c.name.toLowerCase().includes(q));
-    // Always append "Other (unlisted item)" at the bottom
-    const otherEntry = { id: null, name: 'Other (unlisted item)', cost: 0, unit: 'unit' };
-    const results = [...matches, otherEntry];
 
-    if (!results.length) { dropdown.style.display = 'none'; return; }
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="catalog-option" style="pointer-events:none;color:var(--text-muted);font-style:italic">No matching items found in catalog.</div>';
+      dropdown.style.display = 'block';
+      return;
+    }
 
-    dropdown.innerHTML = results.map(c =>
-      `<div class="catalog-option" data-id="${c.id ?? ''}" data-name="${c.name}" data-cost="${c.cost}" data-unit="${c.unit}">
+    dropdown.innerHTML = matches.map(c =>
+      `<div class="catalog-option" data-id="${c.id}" data-name="${c.name}" data-cost="${c.cost}" data-unit="${c.unit}">
         <span class="co-name">${c.name}</span>
-        ${c.id ? `<span class="co-cost">KES ${c.cost.toLocaleString('en-KE', {minimumFractionDigits:2})}</span>` : '<span class="co-cost" style="color:var(--text-muted)">custom price</span>'}
+        <span class="co-cost">KES ${c.cost.toLocaleString('en-KE', {minimumFractionDigits:2})}</span>
        </div>`
     ).join('');
     dropdown.style.display = 'block';
 
     dropdown.querySelectorAll('.catalog-option').forEach(opt => {
       opt.addEventListener('click', function() {
-        const isCustom = !this.dataset.id;
-        addItemRow(this.dataset.name, parseFloat(this.dataset.cost) || 0,
-                   this.dataset.id || '', isCustom ? 1 : 0, isCustom);
+        fillItemRow(this.dataset.name, parseFloat(this.dataset.cost) || 0, this.dataset.id);
         searchInput.value = '';
         dropdown.style.display = 'none';
       });
@@ -573,35 +577,20 @@ if (searchInput) {
   });
 }
 
-// ── Add item row ──────────────────────────────────────────────────────────
-function addItemRow(name = '', cost = 0, catalogId = '', isCustom = 0, focusName = false) {
+// ── Fill the single item row from catalog selection ───────────────────────
+function fillItemRow(name, cost, catalogId) {
   const tbody = document.getElementById('items-body');
   if (!tbody) return;
-  const row = document.createElement('tr');
-  const readonly = (catalogId && !isCustom) ? 'readonly style="background:var(--bg)"' : '';
-  row.innerHTML = `
-    <td>
-      <input type="text" name="item_description[]" value="${name}"
-             placeholder="Item description" oninput="recalcRow(this)" required ${focusName ? '' : ''}>
-      <input type="hidden" name="catalog_id[]" value="${catalogId}">
-      <input type="hidden" name="is_custom[]"  value="${isCustom}">
-    </td>
-    <td><input type="number" name="quantity[]" min="1" value="1"
-               oninput="recalcRow(this)" style="text-align:center"></td>
-    <td><input type="number" name="unit_cost[]" min="0" step="0.01" value="${cost.toFixed(2)}"
-               oninput="recalcRow(this)" placeholder="0.00" ${readonly}></td>
-    <td class="subtotal-cell">KES ${(cost).toLocaleString('en-KE',{minimumFractionDigits:2})}</td>
-    <td><button type="button" class="remove-row" onclick="removeRow(this)" title="Remove">×</button></td>`;
-  tbody.appendChild(row);
-  if (focusName) row.querySelector('input[name="item_description[]"]').focus();
-  recalcGrandTotal();
+  const row = tbody.rows[0]; // always exactly one row
+  row.querySelector('[name="item_description[]"]').value = name;
+  row.querySelector('[name="catalog_id[]"]').value       = catalogId;
+  row.querySelector('[name="unit_cost[]"]').value        = cost.toFixed(2);
+  row.querySelector('[name="quantity[]"]').value         = 1;
+  recalcRow(row.querySelector('[name="quantity[]"]'));
 }
 
 function removeRow(btn) {
-  const tbody = document.getElementById('items-body');
-  if (tbody && tbody.rows.length <= 1) return;
-  btn.closest('tr').remove();
-  recalcGrandTotal();
+  // Single-item form — remove not allowed
 }
 
 function recalcRow(input) {

@@ -145,9 +145,12 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page-wrap">
 
-  <div class="page-header">
+  <div class="page-header" style="flex-wrap:wrap;gap:10px">
     <h1 class="page-title">Admin Dashboard</h1>
-    <span style="font-size:13px;color:var(--text-muted)">Platform-wide metrics</span>
+    <div style="display:flex;gap:8px">
+      <a href="<?= BASE_URL ?>/admin/users.php"   class="btn btn-outline btn-sm">👤 Manage Users</a>
+      <a href="<?= BASE_URL ?>/admin/catalog.php" class="btn btn-outline btn-sm">📦 Manage Catalog</a>
+    </div>
   </div>
 
   <?php renderFlash(); ?>
