@@ -77,13 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canDecide) {
     }
 
     if (in_array($action, ['approve', 'reject'], true)) {
-        processApprovalDecision($action, $reqId, (int)$user['id'], $comments);
-        $nextLvl = (int)$req['current_approval_level'] + 1;
+        processApprovalDecision($action, $reqId, (int)$user['user_id'], $comments);
         $msg = $action === 'approve'
-            ? ($nextLvl > 4 ? $req['requisition_number'] . ' fully approved.' : $req['requisition_number'] . ' approved — forwarded to ' . approvalLevelLabel($nextLvl) . '.')
+            ? $req['requisition_number'] . ' approved.'
             : $req['requisition_number'] . ' has been rejected.';
         setFlash('success', $msg);
-        redirect(BASE_URL . '/requisitions/view.php?id=' . $reqId);
+        redirect(BASE_URL . '/approvals/queue.php');
     }
 }
 
@@ -136,6 +135,19 @@ include __DIR__ . '/../includes/header.php';
     Back
   </button>
   <h1><?= e($req['requisition_number']) ?> Details</h1>
+
+  <!-- Export PDF — available to all users -->
+  <a href="<?= BASE_URL ?>/api/export_pdf.php?id=<?= $reqId ?>" target="_blank"
+     class="btn btn-outline btn-sm" style="gap:5px;margin-left:auto">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    Export PDF
+  </a>
+
   <?php if ($isOwner && $req['current_status'] === 'pending'): ?>
   <div class="actions-menu">
     <button class="actions-menu-btn" onclick="document.getElementById('actions-dropdown').classList.toggle('open')">
@@ -169,6 +181,20 @@ include __DIR__ . '/../includes/header.php';
         <?= priorityBadge($req['priority'] ?? 'medium') ?>
         <span style="color:var(--border)">|</span>
         <span style="font-size:13px;color:var(--text-muted)">Required: <strong><?= e(formatDate($req['date_required'])) ?></strong></span>
+        <?php if ($req['current_status'] === 'approved' && in_array($req['requisition_type'], ['procurement','it_asset','merchandise'])): ?>
+        <span style="margin-left:auto">
+          <a href="<?= BASE_URL ?>/api/generate_lpo.php?id=<?= $reqId ?>" target="_blank"
+             class="btn btn-outline btn-sm" style="gap:5px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            Generate LPO
+          </a>
+        </span>
+        <?php endif; ?>
       </div>
 
       <!-- Meta grid -->
@@ -245,31 +271,34 @@ include __DIR__ . '/../includes/header.php';
       </div>
       <div class="sidebar-card-body">
         <div class="approval-track">
-          <?php foreach ($trackSteps as $lvl => $step):
-            $isSkipped  = $step['current_status'] === 'skipped';
+          <?php
+          // Filter out skipped steps — show only active chain steps
+          $visibleSteps = array_filter($trackSteps, fn($s) => $s['current_status'] !== 'skipped');
+          $visibleCount = count($visibleSteps);
+          $visibleNum   = 0;
+          foreach ($visibleSteps as $lvl => $step):
+            $visibleNum++;
             $isRejected = $step['current_status'] === 'rejected';
             $dotIcon = match($step['current_status']) {
                 'done'    => '✓',
                 'rejected'=> '✕',
                 'current' => '→',
-                'skipped' => '—',
                 default   => '',
             };
             $dotCls = match($step['current_status']) {
                 'done','rejected' => 'done',
                 'current'         => 'current',
-                'skipped'         => 'skipped',
                 default           => 'waiting',
             };
           ?>
           <div class="approval-step <?= $step['current_status'] === 'done' ? 'done' : '' ?>">
             <div class="ap-step-dot <?= $dotCls ?>"
-                 <?= $isRejected ? 'style="background:var(--brand);border-color:var(--brand)"' : '' ?>
-                 <?= $isSkipped  ? 'style="background:var(--bg);border-color:var(--border);color:var(--text-muted)"' : '' ?>>
+                 <?= $isRejected ? 'style="background:var(--brand);border-color:var(--brand)"' : '' ?>>
               <?= $dotIcon ?>
             </div>
             <div class="ap-step-info">
-              <div class="ap-step-role <?= $dotCls ?>" <?= $isSkipped ? 'style="color:var(--text-muted)"' : '' ?>>
+              <div class="ap-step-role <?= $dotCls ?>">
+                <span style="color:var(--text-muted);font-size:11px;margin-right:4px"><?= $visibleNum ?>/<?= $visibleCount ?></span>
                 <?= e($step['label']) ?>
                 <?php if ($step['approver'] && in_array($step['current_status'], ['done','rejected'])): ?>
                   <span style="font-weight:400;color:var(--text-muted)"> — <?= e($step['approver']) ?></span>
@@ -278,11 +307,7 @@ include __DIR__ . '/../includes/header.php';
                   <span style="font-weight:400;font-size:11px;color:var(--orange-text)"> (Pending)</span>
                 <?php endif; ?>
               </div>
-              <?php if ($isSkipped): ?>
-                <div class="ap-step-meta" style="color:var(--text-muted);font-style:italic">
-                  Skipped — <?= e($step['skip_reason']) ?>
-                </div>
-              <?php elseif ($step['date']): ?>
+              <?php if ($step['date']): ?>
                 <div class="ap-step-meta"><?= e(formatDate($step['date'], 'd/m/Y H:i')) ?></div>
               <?php elseif ($step['current_status'] === 'waiting'): ?>
                 <div class="ap-step-meta">Awaiting previous approval</div>
@@ -328,7 +353,9 @@ include __DIR__ . '/../includes/header.php';
       <div class="sidebar-card-body" style="display:flex;flex-direction:column;gap:12px">
         <div class="detail-field"><span class="df-label">Requisition ID</span><span class="df-value" style="font-family:monospace"><?= e($req['requisition_number']) ?></span></div>
         <div class="detail-field"><span class="df-label">Current level</span>
-          <span class="df-value"><?= $req['current_status']==='pending' ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabel((int)$req['current_approval_level'])) : ucfirst($req['current_status']) ?></span>
+          <span class="df-value"><?= $req['current_status']==='pending'
+            ? 'Level '.(int)$req['current_approval_level'].' — '.e(approvalLevelLabelForType($req['requisition_type'], (int)$req['current_approval_level']))
+            : ucfirst($req['current_status']) ?></span>
         </div>
         <div class="detail-field"><span class="df-label">Last updated</span><span class="df-value"><?= e(timeAgo($req['updated_at'] ?? $req['created_at'])) ?></span></div>
         <?php if ($req['total_amount'] > 0): ?>
