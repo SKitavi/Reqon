@@ -12,7 +12,7 @@ Reqon: A lightweight web-based integrated multi-requisition management system fo
 
 ## Scope
 - Personnel Requisitions
-- Procurement Requisitions  
+- IT Asset Requisitions  
 - Maintenance Requisitions
 - Merchandise Requisitions
 
