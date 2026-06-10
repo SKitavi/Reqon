@@ -17,7 +17,7 @@ Reqon: A lightweight web-based integrated multi-requisition management system fo
 - Merchandise Requisitions
 
 ## Project Status
-🚧 **In Development** - Week 14 of 28
+✅ Complete
 
 ## Setup Instructions
 [To be added]
