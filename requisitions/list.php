@@ -16,7 +16,7 @@ $isApprover = $userLevel > 0 || $isAdmin;
 $uid       = (int)$user['user_id'];
 $deptId    = (int)($user['department_id'] ?? 0);
 
-// ── Filters ───────────────────────────────────────────────
+// Filters
 $search         = trim(get('q'));
 $filterType     = get('type');
 $filterStatus   = get('status');
@@ -27,7 +27,7 @@ $page           = max(1, (int)get('page', '1'));
 $perPage        = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
 $offset         = ($page - 1) * $perPage;
 
-// ── Build WHERE with visibility scoping ──────────────────
+// Build WHERE with visibility scoping 
 $where  = ['1=1'];
 $params = [];
 
@@ -81,7 +81,7 @@ if ($dateTo) {
 
 $whereSQL = implode(' AND ', $where);
 
-// ── Count + fetch ─────────────────────────────────────────
+// Count + fetch 
 $totalRow = fetchOne(
     "SELECT COUNT(*) AS cnt
        FROM requisitions r
@@ -109,7 +109,7 @@ $reqs = fetchAll(
     $params
 );
 
-// ── URL builder for pagination (preserves filters) ────────
+// URL builder for pagination (preserves filters) 
 function listUrl(array $extra = []): string {
     $p = array_merge($_GET, $extra);
     unset($p['page']);

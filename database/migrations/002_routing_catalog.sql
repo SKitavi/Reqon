@@ -1,12 +1,6 @@
--- ============================================================
--- Migration 002 — Type-specific routing + item catalog
--- MariaDB 10.4 compatible
--- Run in phpMyAdmin: reqon_db → SQL tab → execute all at once
--- ============================================================
-
 USE reqon_db;
 
--- ── 1. Rebuild approval_levels ────────────────────────────────────────────
+-- 1. Rebuild approval_levels 
 -- Drop the FK on approval_history that references approval_levels,
 -- clear both tables, re-seed approval_levels, then restore the FK.
 
@@ -51,7 +45,7 @@ ALTER TABLE approval_history
         FOREIGN KEY (level_id) REFERENCES approval_levels (level_id);
 
 
--- ── 2. item_catalog table ─────────────────────────────────────────────────
+-- 2. item_catalog table 
 CREATE TABLE IF NOT EXISTS item_catalog (
     catalog_id         INT           NOT NULL AUTO_INCREMENT,
     item_name          VARCHAR(255)  NOT NULL,
@@ -66,7 +60,7 @@ CREATE TABLE IF NOT EXISTS item_catalog (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
--- ── 3. Add catalog_id + is_custom to requisition_items ───────────────────
+-- 3. Add catalog_id + is_custom to requisition_items 
 -- Guard with IF NOT EXISTS equivalent: only runs if columns are absent.
 -- In phpMyAdmin just run as-is; if columns already exist it will error
 -- on those two lines only — safe to ignore those specific errors.
@@ -79,7 +73,7 @@ ALTER TABLE requisition_items
         ON DELETE SET NULL;
 
 
--- ── 4. Seed item_catalog ──────────────────────────────────────────────────
+-- 4. Seed item_catalog
 
 -- IT Asset (12 items)
 INSERT INTO item_catalog (item_name, category, description, standard_unit_cost, unit_label) VALUES

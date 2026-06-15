@@ -1,8 +1,3 @@
--- ============================================================
--- Migration 003 — LPO log table
--- Run in phpMyAdmin: reqon_db → SQL tab → execute
--- ============================================================
-
 USE reqon_db;
 
 CREATE TABLE IF NOT EXISTS lpo_log (

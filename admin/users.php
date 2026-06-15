@@ -14,7 +14,7 @@ $roles       = fetchAll("SELECT role_id, role_name FROM roles ORDER BY role_id")
 $errors      = [];
 $success     = '';
 
-// ── Handle POST (add or edit) ─────────────────────────────────────────────
+// Handle POST (add or edit)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $editId       = (int)post('edit_user_id');
     $fullName     = post('full_name');

@@ -67,7 +67,7 @@ $auditToday = (int)(fetchOne(
     "SELECT COUNT(*) AS c FROM audit_log WHERE DATE(timestamp) = CURDATE()"
 )['c'] ?? 0);
 
-// ── Audit log (filterable) ────────────────────────────────────────────────
+// Audit log (filterable)
 $page    = max(1, (int)get('page', '1'));
 $perPage = 40;
 $offset  = ($page - 1) * $perPage;
@@ -153,7 +153,7 @@ include __DIR__ . '/../includes/header.php';
 
   <?php renderFlash(); ?>
 
-  <!-- ── Insight cards ──────────────────────────────────────────────────── -->
+  <!-- Insight cards -->
   <section class="stat-grid stat-grid-wide" aria-label="Admin insights" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:28px">
 
     <div class="stat-card">
@@ -245,7 +245,7 @@ include __DIR__ . '/../includes/header.php';
 
   </section>
 
-  <!-- ── Audit log ──────────────────────────────────────────────────────── -->
+  <!-- Audit log -->
   <div class="card">
     <div class="card-header" style="flex-wrap:wrap;gap:10px">
       <h2 class="card-title">Audit Log</h2>

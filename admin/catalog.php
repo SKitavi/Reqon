@@ -11,7 +11,7 @@ if (($user = currentUser())['role_id'] !== 1) {
 
 $errors = [];
 
-// ── Handle POST ───────────────────────────────────────────────────────────
+// Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $editId    = (int)post('edit_catalog_id');
     $itemName  = post('item_name');
