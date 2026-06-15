@@ -1,7 +1,5 @@
 <?php
-// procurement/record_lpo.php
-// POST handler: records the LPO generation in lpo_log, then redirects
-// to the printable LPO document. Mary only.
+// POST handler: records the LPO generation in lpo_log, then redirects to the printable LPO document. 
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/auth.php';

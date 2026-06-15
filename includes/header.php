@@ -14,7 +14,7 @@ $userLevel  = getRoleLevel($user);
 $isApprover = $userLevel > 0;
 $isAdmin    = ($user['role_id'] ?? 0) == 1;
 
-// Role label shown next to name — e.g. "Requester", "Dept Head", "HR Director"
+// Role label shown next to name 
 $roleLabel  = $user['role_label'] ?? ($isAdmin ? 'Admin' : ($isApprover ? 'Approver' : 'Requester'));
 ?>
 <!DOCTYPE html>

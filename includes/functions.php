@@ -1,7 +1,7 @@
 <?php
 // Shared utility functions — loaded automatically by config/config.php
 
-// ── Output & Security ──────────────────────────────────────────────────────
+// Output & Security 
 
 function e(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -12,7 +12,7 @@ function redirect(string $url): void {
     exit;
 }
 
-// ── REQ Number ────────────────────────────────────────────────────────────
+// REQ Number 
 
 function generateReqNumber(): string {
     $row  = fetchOne("SELECT COUNT(*) AS total FROM requisitions");
@@ -20,7 +20,7 @@ function generateReqNumber(): string {
     return 'REQ-' . str_pad($next, 3, '0', STR_PAD_LEFT);
 }
 
-// ── Date helpers ──────────────────────────────────────────────────────────
+// Date helpers
 
 function formatDate(?string $date, string $format = null): string {
     if (!$date) return '—';
@@ -37,13 +37,13 @@ function timeAgo(string $date): string {
     return formatDate($date);
 }
 
-// ── Currency ──────────────────────────────────────────────────────────────
+//  Currency
 
 function formatKES(float $amount): string {
     return 'KES ' . number_format($amount, 2);
 }
 
-// ── Badge HTML ────────────────────────────────────────────────────────────
+//  Badge HTML
 
 function statusBadge(string $status): string {
     $classes = [
@@ -68,7 +68,7 @@ function priorityBadge(string $priority): string {
     return '<span class="badge ' . $cls . '">PRIORITY: ' . strtoupper(e($priority)) . '</span>';
 }
 
-// ── Approval level labels ─────────────────────────────────────────────────
+//  Approval level labels
 
 function approvalLevelLabel(int $level): string {
     $labels = [
@@ -80,7 +80,7 @@ function approvalLevelLabel(int $level): string {
     return $labels[$level] ?? 'Level ' . $level;
 }
 
-// ── Flash messages ────────────────────────────────────────────────────────
+//  Flash messages 
 
 function setFlash(string $type, string $message): void {
     $_SESSION['flash'] = ['type' => $type, 'message' => $message];
@@ -94,7 +94,7 @@ function renderFlash(): void {
     unset($_SESSION['flash']);
 }
 
-// ── Audit log ─────────────────────────────────────────────────────────────
+// Audit log 
 
 function auditLog(string $action, string $table, int $recordId, string $details = ''): void {
     $userId = $_SESSION['user']['user_id'] ?? $_SESSION['user']['id'] ?? null;
@@ -106,7 +106,7 @@ function auditLog(string $action, string $table, int $recordId, string $details 
     );
 }
 
-// ── Input helpers ─────────────────────────────────────────────────────────
+// Input helpers 
 
 function post(string $key, string $default = ''): string {
     return trim($_POST[$key] ?? $default);
@@ -116,7 +116,7 @@ function get(string $key, string $default = ''): string {
     return trim($_GET[$key] ?? $default);
 }
 
-// ── Role / approval level ─────────────────────────────────────────────────
+// Role / approval level
 
 /**
  * Returns the approval level (1–4) for a user, or 0 if none.
@@ -138,7 +138,7 @@ function getRoleLevel(array $user): int {
     return 0;
 }
 
-// ── Type-specific routing engine ──────────────────────────────────────────
+// Requisition Type-specific routing engine 
 
 /**
  * Known fixed approver user_ids (from seed data).
@@ -405,7 +405,7 @@ function getNextApprover(int $level, int $deptId): ?array {
     return null;
 }
 
-// ── Approval decision engine ──────────────────────────────────────────────
+// Approval decision engine 
 
 /**
  * Process an approve or reject decision.

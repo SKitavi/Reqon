@@ -13,9 +13,7 @@ if ($roleId !== 1) {
     setFlash('error', 'Access denied.');
     redirect(BASE_URL . '/dashboard.php');
 }
-
-// ── Insight cards ─────────────────────────────────────────────────────────
-
+ 
 // 1. Total requisitions (all time)
 $totalReqs = (int)(fetchOne("SELECT COUNT(*) AS c FROM requisitions")['c'] ?? 0);
 
