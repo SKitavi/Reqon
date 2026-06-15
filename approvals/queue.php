@@ -17,7 +17,7 @@ if ($userLevel === 0) {
     redirect(BASE_URL . '/dashboard.php');
 }
 
-// ── Filter inputs (all GET so they're bookmarkable) ───────────────────────
+// Filter inputs (all GET so they're bookmarkable)
 $search    = trim(get('q'));
 $filterType     = get('type');
 $filterPriority = get('priority');
@@ -27,7 +27,7 @@ $page      = max(1, (int)(get('page', '1')));
 $perPage   = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
 $highlight = (int)get('highlight'); // scroll to this card after a redirect
 
-// ── Build query ───────────────────────────────────────────────────────────
+// Build query
 // Mary (Procurement Head, user 7) is level 1 in session but acts at level 2
 // for Procurement/IT Asset/Merchandise. Handle both cases.
 
@@ -115,7 +115,7 @@ $reqs = fetchAll(
     $params
 );
 
-// ── Icons by type ─────────────────────────────────────────────────────────
+// Icons by type 
 function typeIcon(string $type): string {
     $icons = [
         'personnel'   => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',

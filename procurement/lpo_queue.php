@@ -18,7 +18,7 @@ if (!$isMary && !$isAdmin) {
     redirect(BASE_URL . '/dashboard.php');
 }
 
-// ── Filters ───────────────────────────────────────────────────────────────
+// Filters
 $filterType   = get('type');
 $filterStatus = get('lpo_status'); 
 $search       = trim(get('q'));

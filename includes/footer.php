@@ -2,7 +2,7 @@
 </main>
 
 <script>
-  // ── User dropdown toggle ─────────────────────────────────
+  //  User dropdown toggle 
   function toggleUserMenu() {
     const dropdown = document.getElementById('user-dropdown');
     const btn      = document.getElementById('user-menu-btn');
@@ -19,7 +19,7 @@
     }
   });
 
-  // ── Auto-dismiss alerts after 5 s ───────────────────────
+  // Auto-dismiss alerts after 5 s
   document.querySelectorAll('.alert').forEach(function(el) {
     setTimeout(function() {
       el.style.transition = 'opacity .4s';

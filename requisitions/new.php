@@ -19,7 +19,7 @@ foreach (REQUISITION_TYPES as $k => $v) {
 
 $departments = fetchAll("SELECT department_id, department_name FROM departments ORDER BY department_name");
 
-// ── Step management ───────────────────────────────────────────────────────
+// Step management 
 $step = (int)($_SESSION['req_form']['step'] ?? 1);
 
 if (isset($_POST['action']) && $_POST['action'] === 'back') {
@@ -34,9 +34,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'cancel') {
 
 $errors = [];
 
-// ══════════════════════════════════════════════════════════
+
 // STEP 1 POST
-// ══════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
     $type     = post('type');
     $deptId   = (int)post('department_id');
@@ -71,9 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
     $step = 1;
 }
 
-// ══════════════════════════════════════════════════════════
 // STEP 2 POST
-// ══════════════════════════════════════════════════════════
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     $description = post('description');
     $type        = $_SESSION['req_form']['type'] ?? '';
@@ -134,9 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     $step = 2;
 }
 
-// ══════════════════════════════════════════════════════════
 // STEP 3 POST — final submit
-// ══════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     $form = $_SESSION['req_form'] ?? [];
     if (empty($form['type'])) {
@@ -157,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     }
 }
 
-// ── Pre-fill data ─────────────────────────────────────────────────────────
+// Pre-fill data
 $form = $_SESSION['req_form'] ?? [];
 
 $deptName = '';
@@ -509,7 +505,7 @@ include __DIR__ . '/../includes/header.php';
 </div><!-- /page-wrap -->
 
 <script>
-// ── Catalog data from PHP ─────────────────────────────────────────────────
+//  Catalog data from PHP
 const CATALOG = <?= json_encode(array_map(fn($c) => [
     'id'    => $c['catalog_id'],
     'name'  => $c['item_name'],
@@ -517,13 +513,13 @@ const CATALOG = <?= json_encode(array_map(fn($c) => [
     'unit'  => $c['unit_label'],
 ], $catalogItems)) ?>;
 
-// ── Type change (step 1) ──────────────────────────────────────────────────
+// Type change (step 1)
 function handleTypeChange(type) {
   const f = document.getElementById('field-title');
   if (f) f.style.display = type === 'personnel' ? 'block' : 'none';
 }
 
-// ── Lead time warning ─────────────────────────────────────────────────────
+// Lead time warning 
 function showLeadTimeWarning(dateVal) {
   const warning = document.getElementById('lead-time-warning');
   const textEl  = document.getElementById('lead-time-text');
@@ -537,7 +533,7 @@ function showLeadTimeWarning(dateVal) {
   }
 }
 
-// ── Catalog search dropdown ───────────────────────────────────────────────
+// Catalog search dropdown
 const searchInput = document.getElementById('catalog-search');
 const dropdown    = document.getElementById('catalog-dropdown');
 
@@ -577,7 +573,7 @@ if (searchInput) {
   });
 }
 
-// ── Fill the single item row from catalog selection ───────────────────────
+// Fill the single item row from catalog selection
 function fillItemRow(name, cost, catalogId) {
   const tbody = document.getElementById('items-body');
   if (!tbody) return;
@@ -613,7 +609,7 @@ function recalcGrandTotal() {
   if (el) el.textContent = 'KES ' + total.toLocaleString('en-KE', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-// ── Prevent double-submit ─────────────────────────────────────────────────
+// Prevent double-submit 
 const submitBtn = document.getElementById('submit-btn');
 if (submitBtn) {
   submitBtn.closest('form').addEventListener('submit', function() {
@@ -622,7 +618,7 @@ if (submitBtn) {
   });
 }
 
-// ── On load ───────────────────────────────────────────────────────────────
+// On load
 document.addEventListener('DOMContentLoaded', function() {
   const typeSelect = document.getElementById('type');
   if (typeSelect && typeSelect.value) handleTypeChange(typeSelect.value);

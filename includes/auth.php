@@ -41,9 +41,6 @@ function hasRole(string ...$roles): bool {
 
 //  Login 
 
-/**
- * Attempts login. Returns ['ok'=>true,'user'=>[...]] or ['ok'=>false,'error'=>'...']
- */
 function attemptLogin(string $email, string $password): array {
     $db   = getDB();
     $stmt = $db->prepare("
