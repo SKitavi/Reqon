@@ -1,16 +1,14 @@
-/* ═══════════════════════════════════════════════════════
-   Reqon — Global Stylesheet
-   ═══════════════════════════════════════════════════════ */
+/* Global Sylesheet */
 
 /* ── Reset & Base ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --brand:       #C0392B;   /* Reqon red  */
+  --brand:       #ee0f0f;   /* Reqon red  */
   --brand-dark:  #96281B;
   --slate:       #4A5568;   /* login button, nav text */
   --slate-light: #718096;
-  --bg:          #F7F8FA;   /* page background */
+  --bg:          #fff7f7;   /* page background */
   --white:       #FFFFFF;
   --border:      #E2E8F0;
   --text:        #2D3748;
@@ -41,7 +39,7 @@ a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font-family: inherit; font-size: inherit; }
 img { max-width: 100%; }
 
-/* ── Utility ───────────────────────────────────────────── */
+/* Utility  */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
@@ -58,15 +56,18 @@ img { max-width: 100%; }
 .mb-2 { margin-bottom: 1rem; }
 
 
-/* ══════════════════════════════════════════════════════════
+/*
    SCREEN 1 — LOGIN
-   ══════════════════════════════════════════════════════════ */
+*/
 
 .login-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg);
+  background-image: url('/Reqon/assets/images/isuzu_bg copy.webp'); 
+  background-size: cover;       
+  background-position: center;  
+  background-repeat: no-repeat;
 }
 
 .login-page .login-brand {
@@ -84,11 +85,11 @@ img { max-width: 100%; }
   font-weight: 700;
   font-size: 14px;
   letter-spacing: .03em;
-  color: var(--text);
+  color: var(--brand);
 }
 
-.login-page .brand-name  { font-size: 28px; font-weight: 700; color: var(--brand); line-height: 1; }
-.login-page .brand-sub   { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.login-page .brand-name  { font-size: 30px; font-weight: 700; color: var(--white); line-height: 1; }
+.login-page .brand-sub   { font-size: 16px; color: var(--white); margin-top: 2px; }
 
 .login-page .login-card-wrap {
   flex: 1;
@@ -108,7 +109,7 @@ img { max-width: 100%; }
   box-shadow: var(--shadow);
 }
 
-/* Form elements ── */
+/* Form elements  */
 .form-group { margin-bottom: 20px; }
 
 .form-group label {
@@ -175,7 +176,7 @@ img { max-width: 100%; }
 .btn-login:hover  { background: #3a4254; }
 .btn-login:active { background: #2d3345; }
 
-/* Alert ── */
+/* Alert */
 .alert {
   padding: 10px 14px; border-radius: var(--radius);
   font-size: 13px; margin-bottom: 20px;
@@ -183,7 +184,7 @@ img { max-width: 100%; }
 .alert-error   { background: var(--red-bg);   color: var(--red-text);   border: 1px solid #f5c6c6; }
 .alert-success { background: var(--green-bg); color: var(--green-text); border: 1px solid #b2dfcd; }
 
-/* Login footer ── */
+/* Login footer  */
 .login-footer {
   display: flex;
   align-items: center;
@@ -196,9 +197,9 @@ img { max-width: 100%; }
 }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    GLOBAL NAV (used in all authenticated pages)
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .topnav {
   background: var(--white);
@@ -221,9 +222,9 @@ img { max-width: 100%; }
 .topnav .nav-brand .logo-box {
   font-size: 12px; font-weight: 700; padding: 5px 9px;
   border: 1px solid var(--border); border-radius: 6px;
-  background: var(--white); color: var(--text);
+  background: var(--white); color: var(--brand);
 }
-.topnav .nav-brand .brand-name { font-size: 22px; font-weight: 700; color: var(--brand); }
+.topnav .nav-brand .brand-name { font-size: 22px; font-weight: 700; color: var(--slate); }
 
 .topnav .nav-search {
   flex: 1; max-width: 420px; margin-left: 12px;
@@ -258,7 +259,7 @@ img { max-width: 100%; }
 .topnav .nav-user .user-name { font-size: 14px; font-weight: 500; color: var(--brand); }
 .topnav .nav-user .chevron { font-size: 11px; color: var(--text-muted); }
 
-/* Dropdown menu ── */
+/* Dropdown menu */
 .nav-dropdown {
   display: none;
   position: absolute; top: calc(100% + 8px); right: 0;
@@ -275,7 +276,7 @@ img { max-width: 100%; }
 .nav-dropdown .divider { height: 1px; background: var(--border); margin: 4px 0; }
 .nav-dropdown .logout-link { color: var(--brand); }
 
-/* Notification bell ── */
+/* Notification bell */
 .nav-bell { position: relative; cursor: pointer; font-size: 18px; color: var(--slate-light); }
 .nav-bell .badge {
   position: absolute; top: -4px; right: -5px;
@@ -286,9 +287,9 @@ img { max-width: 100%; }
 }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    PAGE WRAPPER
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .page-wrap {
   max-width: 1140px;
@@ -303,9 +304,9 @@ img { max-width: 100%; }
 .page-title { font-size: 22px; font-weight: 600; color: var(--text); }
 
 
-/* ══════════════════════════════════════════════════════════
+/*
    SCREEN 2 — DASHBOARD
-   ══════════════════════════════════════════════════════════ */
+   */
 
 /* Stat cards ── */
 .stat-grid {
@@ -340,9 +341,9 @@ img { max-width: 100%; }
 .stat-card .stat-value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    TABLE (used in dashboard and other list pages)
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .card {
   background: var(--white);
@@ -369,7 +370,7 @@ table.req-table thead th {
   font-size: 11px; font-weight: 600;
   letter-spacing: .07em; text-transform: uppercase;
   color: var(--text-muted);
-  background: var(--bg);
+  background: var(--white);
   border-bottom: 1px solid var(--border);
 }
 
@@ -390,15 +391,15 @@ table.req-table .req-id { font-weight: 600; }
 .card-footer {
   padding: 14px 22px;
   border-top: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--white);
 }
 .card-footer a { font-size: 13px; color: var(--green); font-weight: 500; }
 .card-footer a:hover { text-decoration: underline; }
 
 
-/* ══════════════════════════════════════════════════════════
-   BADGES (status pills)
-   ══════════════════════════════════════════════════════════ */
+/* 
+   Badges/status
+ */
 
 .badge {
   display: inline-flex; align-items: center;
@@ -415,9 +416,9 @@ table.req-table .req-id { font-weight: 600; }
 .badge-priority-low    { background: var(--green-bg);  color: var(--green-text);  font-size: 11px; }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    BUTTONS
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -443,9 +444,9 @@ table.req-table .req-id { font-weight: 600; }
 .btn-sm { padding: 5px 12px; font-size: 13px; }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    BREADCRUMB
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .breadcrumb {
   display: flex; align-items: center; gap: 6px;
@@ -458,9 +459,9 @@ table.req-table .req-id { font-weight: 600; }
 .breadcrumb .current { color: var(--text); }
 
 
-/* ══════════════════════════════════════════════════════════
+/* 
    EMPTY STATE
-   ══════════════════════════════════════════════════════════ */
+ */
 
 .empty-state {
   text-align: center; padding: 48px 20px; color: var(--text-muted);
@@ -468,9 +469,9 @@ table.req-table .req-id { font-weight: 600; }
 .empty-state .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: .5; }
 .empty-state p { font-size: 14px; }
 
-/* ══════════════════════════════════════════════════════════
-   MULTI-STEP FORM (Screens 3 — New Requisition)
-   ══════════════════════════════════════════════════════════ */
+/* 
+   3-STEP FORM (New Requisition)
+ */
  
 /* Step progress indicator */
 .step-progress {
@@ -737,9 +738,9 @@ table.req-table .req-id { font-weight: 600; }
   border-top: 1px solid var(--border);
 }
 
-/* ══════════════════════════════════════════════════════════
+/* 
    SCREEN 4 — APPROVAL QUEUE
-   ══════════════════════════════════════════════════════════ */
+ */
  
 /* Filter bar */
 .filter-bar {
@@ -926,9 +927,9 @@ table.req-table .req-id { font-weight: 600; }
   color: var(--text-muted);
 }
 
-/* ══════════════════════════════════════════════════════════
+/*
    SCREEN 5 — REQUISITION DETAILS
-   ══════════════════════════════════════════════════════════ */
+ */
  
 .detail-layout {
   display: grid;
@@ -1139,9 +1140,9 @@ table.req-table .req-id { font-weight: 600; }
 }
  
  
-/* ══════════════════════════════════════════════════════════
-   DAY 8 — NOTIFICATIONS PAGE
-   ══════════════════════════════════════════════════════════ */
+/* 
+ NOTIFICATIONS PAGE
+  */
  
 .notif-list { display: flex; flex-direction: column; gap: 0; }
  
@@ -1184,9 +1185,9 @@ table.req-table .req-id { font-weight: 600; }
 .mark-all-btn:hover { text-decoration: underline; }
  
  
-/* ══════════════════════════════════════════════════════════
+/* 
    AUDIT LOG
-   ══════════════════════════════════════════════════════════ */
+ */
  
 .audit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .audit-table th {
@@ -1213,11 +1214,8 @@ table.req-table .req-id { font-weight: 600; }
 .audit-action.UPDATE { background: var(--orange-bg); color: var(--orange-text); }
 .audit-action.LOGIN  { background: #EBF4FF; color: #1A5276; }
 
-/* ══════════════════════════════════════════════════════════
-    POLISH & RESPONSIVE FIXES
-   ══════════════════════════════════════════════════════════ */
  
-/* Page-level loading state — add .loading to body while fetch is in flight */
+/* Page-level loading state */
 body.loading::after {
   content: '';
   position: fixed; top: 0; left: 0; right: 0;
@@ -1312,7 +1310,7 @@ select {
   }
 }
  
-/* Print styles — useful for supervisor demo */
+
 @media print {
   .topnav, .form-actions, .queue-card-actions,
   .decision-panel, .filter-bar, .btn,
@@ -1326,12 +1324,6 @@ select {
   a { color: inherit; text-decoration: none; }
 }
  
-/* Subtle hover on stat cards */
-.stat-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-1px);
-  cursor: default;
-}
  
 /* Status badge text — don't let it wrap */
 .badge { white-space: nowrap; }
@@ -1360,7 +1352,7 @@ table.req-table tbody td {
 ::-webkit-scrollbar-thumb:hover { background: var(--slate-light); }
 
 
-/* ── Role label in nav ───────────────────────────────────────────────────── */
+/* Role label in nav  */
 .user-role-label {
   font-size: 11px;
   color: var(--text-muted);
@@ -1368,7 +1360,7 @@ table.req-table tbody td {
   margin-left: 2px;
 }
 
-/* ── Approval tracker: skipped step ─────────────────────────────────────── */
+/* Approval tracker */
 .ap-step-dot.skipped {
   background: var(--bg);
   border: 1px dashed var(--border);
@@ -1376,16 +1368,15 @@ table.req-table tbody td {
   font-size: 11px;
 }
 
-/* ── Admin stat cards ────────────────────────────────────────────────────── */
+/* Admin stat cards */
 .stat-card .stat-sub {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
 }
-.stat-card-warn  { border-left: 3px solid var(--orange-text, #e67e22) }
-.stat-card-danger{ border-left: 3px solid var(--brand, #c0392b) }
 
-/* ── Catalog dropdown ────────────────────────────────────────────────────── */
+
+/*  Catalog dropdown */
 .catalog-search-wrap { position: relative }
 .catalog-dropdown {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
@@ -1401,7 +1392,7 @@ table.req-table tbody td {
 .co-name { flex: 1 }
 .co-cost { color: var(--green); font-weight: 600; white-space: nowrap }
 
-/* ── Audit action badges ─────────────────────────────────────────────────── */
+/* Audit action badges */
 .audit-action {
   display: inline-block; padding: 2px 8px; border-radius: 4px;
   font-size: 11px; font-weight: 600; letter-spacing: .4px;

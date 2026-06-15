@@ -1,5 +1,5 @@
 <?php
-// dashboard.php — staff + approver dashboard (admin goes to admin/dashboard.php)
+// dashboard.php — staff + approver dashboard RBAC applied directly to dashboard
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/auth.php';
 
@@ -16,15 +16,14 @@ if ($roleId === 1) {
     redirect(BASE_URL . '/admin/dashboard.php');
 }
 
-// ── Determine visibility scope ────────────────────────────────────────────
-// Requester (level 0, role 4)  → own requisitions only
-// Dept Head (level 1)          → own department
-// Procurement Head (user 7)    → Procurement + IT Asset + Merchandise
-// HR Director (level 2)        → all Personnel
-// Finance Director (level 3)   → everything
-// MD (level 4)                 → everything
+// Scope used: Requester (role 4)  -  own requisitions only
+// Dept Head (role 3)          - own department
+// Procurement Head (user 7, role 3)    - Procurement + IT Asset + Merchandise
+// HR Director (role 2)        - all Personnel
+// Finance Director (role 3)   - everything
+// MD (role 3)                 - everything
 
-$scopeWhere  = '1=1';
+$scopeWhere  = '1=1'; //initialize dynamic SQL WHERE filter
 $scopeParams = [];
 
 if ($userLevel === 0) {
@@ -45,9 +44,9 @@ if ($userLevel === 0) {
         $scopeParams = [];
     }
 }
-// level 3 (Finance) and level 4 (MD) → default 1=1 (everything)
+// level 3 (Finance) and level 4 (MD) default 1=1 (everything)
 
-// ── Stats ─────────────────────────────────────────────────────────────────
+// Stats PDO
 $statsStmt = getDB()->prepare(
     "SELECT COUNT(*) AS total,
             SUM(current_status='pending')  AS pending,
@@ -56,10 +55,10 @@ $statsStmt = getDB()->prepare(
        FROM requisitions r
       WHERE {$scopeWhere}"
 );
-$statsStmt->execute($scopeParams);
-$stats = $statsStmt->fetch();
+$statsStmt->execute($scopeParams); //execute SQL
+$stats = $statsStmt->fetch(); //fetch results
 
-// ── Recent requisitions (last 10) ─────────────────────────────────────────
+// Recent requisitions (last 8) 
 $recentStmt = getDB()->prepare(
     "SELECT r.*,
             d.department_name AS dept_name,
@@ -69,12 +68,12 @@ $recentStmt = getDB()->prepare(
        LEFT JOIN users      u ON u.user_id         = r.requester_id
       WHERE {$scopeWhere}
       ORDER BY r.created_at DESC
-      LIMIT 10"
+      LIMIT 8"
 );
 $recentStmt->execute($scopeParams);
 $recentReqs = $recentStmt->fetchAll();
 
-// ── Role-specific extra metrics ───────────────────────────────────────────
+// Role-specific extra metrics 
 $isMary        = ($uid === APPROVER_PROCUREMENT_HEAD);
 $isFinanceDir  = ($uid === APPROVER_FINANCE_DIR);
 $isMD          = ($uid === APPROVER_MD);
@@ -152,7 +151,7 @@ include __DIR__ . '/includes/header.php';
 
   <?php renderFlash(); ?>
 
-  <!-- ── Role-specific insight cards ─────────────────────────────────────── -->
+  <!--  Role-specific insight cards -->
 
   <?php if ($isMary): ?>
   <!-- Mary: Total Goods Reqs · Approved This Month · Pending LPOs · LPOs Generated -->

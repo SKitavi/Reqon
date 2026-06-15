@@ -1,7 +1,5 @@
 <?php
 // procurement/lpo_queue.php
-// Mary's LPO management page — lists all fully approved
-// procurement/it_asset/merchandise requisitions and tracks LPO generation.
 // Access: Procurement Head (user 7) only. Admin gets view-only access.
 
 require_once __DIR__ . '/../config/config.php';
@@ -22,7 +20,7 @@ if (!$isMary && !$isAdmin) {
 
 // ── Filters ───────────────────────────────────────────────────────────────
 $filterType   = get('type');
-$filterStatus = get('lpo_status'); // 'pending' | 'generated' | ''
+$filterStatus = get('lpo_status'); 
 $search       = trim(get('q'));
 $page         = max(1, (int)get('page', '1'));
 $perPage      = 20;

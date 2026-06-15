@@ -1,8 +1,6 @@
 <?php
 // api/export_pdf.php
 // Generates a print-ready HTML summary of any requisition.
-// Available to all authenticated users who can view the requisition.
-// User clicks "Print / Save as PDF" → browser print dialog → Save as PDF.
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/auth.php';

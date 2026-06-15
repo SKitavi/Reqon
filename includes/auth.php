@@ -1,11 +1,11 @@
 <?php
-// includes/auth.php — session, authentication, role helpers
+// session, authentication, role helpers
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ── Checks ────────────────────────────────────────────────────────────────
+// Checks 
 
 function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
@@ -39,7 +39,7 @@ function hasRole(string ...$roles): bool {
     return false;
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────
+//  Login 
 
 /**
  * Attempts login. Returns ['ok'=>true,'user'=>[...]] or ['ok'=>false,'error'=>'...']
@@ -114,7 +114,6 @@ function _computeApprovalLevel(int $roleId, string $section, int $deptId): int {
 
 /**
  * Role label for the header, prefixed with department name.
- * e.g. "IT · Requester", "HR · HR Director", "System Admin"
  * Admin (role_id=1) gets no prefix.
  */
 function _computeRoleLabel(int $roleId, int $approvalLevel): string {
@@ -141,7 +140,7 @@ function _buildRoleLabelWithDept(string $roleLabel, string $deptName): string {
     return $deptName . ' · ' . $roleLabel;
 }
 
-// ── Logout ────────────────────────────────────────────────────────────────
+// Logout
 
 function logout(): void {
     $_SESSION = [];
@@ -156,7 +155,7 @@ function logout(): void {
     exit;
 }
 
-// ── Post-login redirect ───────────────────────────────────────────────────
+// Post-login redirect 
 
 /**
  * Admin → admin/dashboard.php

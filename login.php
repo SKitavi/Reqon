@@ -1,13 +1,13 @@
 <?php
-// login.php - Screen 1
+// Login screen
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/auth.php';
 
-// If already logged in, redirect away
+
 if (isLoggedIn()) {
     redirectAfterLogin();
 }
-
+//initialize to prevent PHP crash
 $error   = '';
 $success = '';
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result['ok']) {
             redirectAfterLogin();
         } else {
-            $error = $result['error'];
+            $error = $result['Error: user does not exist'];
         }
     }
 }
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="login-page">
 
-  <!-- Brand header (top-left, matching prototype) -->
+  <!-- Brand header -->
   <header class="login-brand">
     <div class="brand-logo-box">ISUZU EA</div>
     <div>
@@ -116,14 +116,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
         </div>
 
-        <!-- Remember me + Forgot password -->
+        <!-- Forgot password 
         <div class="form-row-split">
           <label class="checkbox-label">
             <input type="checkbox" name="remember" value="1">
             Remember Me
           </label>
           <a href="#" class="forgot-link">Forgot Password?</a>
-        </div>
+        </div>-->
 
         <button type="submit" class="btn-login">Login</button>
 

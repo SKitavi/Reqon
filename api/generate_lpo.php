@@ -1,8 +1,6 @@
 <?php
 // api/generate_lpo.php
-// Generates a printable Local Purchase Order for fully approved
-// procurement / it_asset / merchandise requisitions.
-// Opens in a new tab; user prints or saves as PDF via the browser.
+// Generates a printable Local Purchase Order for fully approved procurement / it_asset / merchandise requisitions.
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/auth.php';
