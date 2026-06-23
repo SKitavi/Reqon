@@ -13,51 +13,10 @@ Reqon: A lightweight web-based integrated multi-requisition management system fo
 ## Scope
 - Personnel Requisitions
 - IT Asset Requisitions  
-- Maintenance Requisitions
+- Procurement Requisitions
 - Merchandise Requisitions
 
 ## Project Status
 ✅ Complete
 
-## Setup Instructions
-[To be added]
 
-## Project Structure
-```
-reqon
-├── assets
-│   ├── css
-│   │   └── style.css
-│   ├── images
-│   └── js
-│       └── main.js
-├── config
-│   ├── config.php
-│   └── database.php
-├── database
-│   ├── migrations
-│   ├── schema.sql
-│   └── seed_data.sql
-├── docs
-│   ├── diagrams
-│   ├── ui
-│   └── user-manual
-├── includes
-│   ├── footer.php
-│   ├── functions.php
-│   └── header.php
-├── index.php
-├── LICENSE
-├── modules
-│   ├── admin
-│   ├── approvals
-│   ├── auth
-│   ├── reports
-│   └── requisitions
-│       ├── maintenance
-│       ├── merchandise
-│       ├── personnel
-│       └── procurement
-├── README.md
-├── tests
-└── uploads
