@@ -10,6 +10,61 @@ Reqon: A lightweight web-based integrated multi-requisition management system fo
 - **Server**: Apache (XAMPP)
 - **Version Control**: Git/GitHub
 
+## Project Structure
+
+```text
+Reqon/
+├── admin
+│   ├── audit.php
+│   ├── catalog.php
+│   ├── dashboard.php
+│   └── users.php
+├── api
+│   ├── cancel_requisition.php
+│   ├── catalog.php
+│   ├── export_pdf.php
+│   ├── generate_lpo.php
+│   ├── notifications.php
+│   └── sections.php
+├── approvals
+│   ├── action.php
+│   └── queue.php
+├── assets
+│   ├── css
+│   │   └── style.css
+│   └── images
+│       ├── isuzu_bg copy.webp
+│       └── isuzu_bg.webp
+├── config
+│   ├── config.php
+│   └── database.php
+├── dashboard.php
+├── database
+│   └── reqon_db-4.sql
+├── docs
+│   └── SCI400 1049511 Project Documentation.pdf
+├── includes
+│   ├── auth.php
+│   ├── db.php
+│   ├── footer.php
+│   ├── functions.php
+│   └── header.php
+├── index.php
+├── LICENSE
+├── login.php
+├── logout.php
+├── notifications
+│   └── index.php
+├── procurement
+│   ├── lpo_queue.php
+│   └── record_lpo.php
+├── README.md
+└── requisitions
+    ├── list.php
+    ├── new.php
+    └── view.php
+```
+
 ## Scope
 - Personnel Requisitions
 - IT Asset Requisitions  
