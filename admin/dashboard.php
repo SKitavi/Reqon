@@ -14,13 +14,13 @@ if ($roleId !== 1) {
     redirect(BASE_URL . '/dashboard.php');
 }
  
-// 1. Total requisitions (all time)
+// Total requisitions 
 $totalReqs = (int)(fetchOne("SELECT COUNT(*) AS c FROM requisitions")['c'] ?? 0);
 
-// 2. Pending right now (across all levels)
+// Pending right now (across all levels)
 $pendingNow = (int)(fetchOne("SELECT COUNT(*) AS c FROM requisitions WHERE current_status = 'pending'")['c'] ?? 0);
 
-// 3. Approved this month — count + total KES
+// Approved this month 
 $approvedMonth = fetchOne(
     "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount),0) AS total_kes
        FROM requisitions
@@ -29,21 +29,21 @@ $approvedMonth = fetchOne(
         AND YEAR(final_decision_date)  = YEAR(NOW())"
 );
 
-// 4. Average approval time (days from submission to final decision, approved only)
+// Average approval time (days from submission to final decision, approved only)
 $avgApproval = fetchOne(
     "SELECT ROUND(AVG(TIMESTAMPDIFF(DAY, submission_date, final_decision_date)), 1) AS avg_days
        FROM requisitions
       WHERE current_status = 'approved' AND final_decision_date IS NOT NULL"
 );
 
-// 5. Stale requests — pending > 7 days
+// Stale requests — pending > 7 days
 $staleCount = (int)(fetchOne(
     "SELECT COUNT(*) AS c FROM requisitions
       WHERE current_status = 'pending'
         AND submission_date < DATE_SUB(NOW(), INTERVAL 7 DAY)"
 )['c'] ?? 0);
 
-// 6. Active users this week
+//  Active users this week
 $activeUsers = (int)(fetchOne(
     "SELECT COUNT(*) AS c FROM users
       WHERE last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
