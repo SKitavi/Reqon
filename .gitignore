@@ -19,9 +19,6 @@ vendor/
 .DS_Store
 Thumbs.db
 
-# Database
-*.sql
-*.sqlite
 # Track migration files explicitly
 !database/migrations/*.sql
 

@@ -170,7 +170,6 @@ const APPROVER_MD             = 10;  // James Ngugi        — Managing Director
  * @return array               ordered list of chain steps (skipped ones included for tracker display)
  */
 function buildApprovalChain(string $reqType, int $submitterId, int $deptId): array {
-    // MD submitting → auto-approve, no chain
     if ($submitterId === APPROVER_MD) {
         return [];
     }
